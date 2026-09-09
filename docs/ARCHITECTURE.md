@@ -59,7 +59,12 @@ de fondo del encargo aunque no se ejecute literalmente "en el NAS".
 |---|---|---|
 | `domain/` | Núcleo probado | `models.py`, `states.py` |
 | `providers/` | Contrato probado, sin adaptadores concretos | `base.py`, `models.py` |
-| `inventory/`, `parsers/`, `matching/`, `policies/`, `planning/`, `transactions/`, `plex/`, `reports/` | Solo esqueleto (`__init__.py` vacío) | — |
+| `inventory/` | Núcleo probado (huellas, sidecars, escáner con protección anti-symlink) | `fingerprint.py`, `sidecars.py`, `scanner.py` |
+| `parsers/` | Interpretación de nombres probada | `filename.py` |
+| `policies/` | Generación de nombres probada (nunca renombra) | `naming.py` |
+| `matching/` | Motor de coincidencias probado, las 6 reglas innegociables cubiertas | `engine.py` |
+| `planning/` | Planes inmutables + detección de conflictos + frase de autorización, probado | `plan.py` |
+| `transactions/`, `plex/`, `reports/` | Solo esqueleto (`__init__.py` vacío) | — |
 | `cli/` | `doctor` real y probado (unit + integración real contra Plex/NAS) | `main.py`, `checks.py`, `config.py` |
 | `mcp/` | No empezado | — |
 | `.claude/skills/`, `.claude/hooks/` | No empezado | — |
