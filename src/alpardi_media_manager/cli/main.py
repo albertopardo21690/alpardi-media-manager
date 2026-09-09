@@ -14,23 +14,17 @@ from pathlib import Path
 from alpardi_media_manager.backup.engine import crear_backup, verificar_backup
 from alpardi_media_manager.cli.checks import CheckStatus, run_all_checks
 from alpardi_media_manager.cli.config import leer_plex_token, nas_ssh_host, plex_base_url
-from alpardi_media_manager.domain.models import ContentType, InventoryItem
+from alpardi_media_manager.domain.models import ContentType
 from alpardi_media_manager.inventory.scanner import escanear_directorio
-from alpardi_media_manager.matching.engine import LocalEvidence, decidir_coincidencia
-from alpardi_media_manager.parsers.filename import parsear_nombre_pelicula
+from alpardi_media_manager.matching.engine import verificar_coincidencias_pelicula
 from alpardi_media_manager.planning.plan import (
-    RenameOperation,
     calcular_inventory_hash,
     cargar_plan,
     generar_plan_renombrado,
     guardar_plan,
+    proponer_operaciones_pelicula,
 )
 from alpardi_media_manager.plex.client import PlexClient
-from alpardi_media_manager.policies.naming import (
-    MovieNamingInput,
-    proponer_archivo_pelicula,
-    proponer_carpeta_pelicula,
-)
 from alpardi_media_manager.providers.status import leer_estado_proveedores
 from alpardi_media_manager.reports.inventory_report import (
     inventario_a_csv,
@@ -147,35 +141,6 @@ def cmd_export(root: str, library_id: str, content_type: str, formato: str, sali
     return 0
 
 
-def _proponer_operaciones_pelicula(
-    items: list[InventoryItem],
-) -> tuple[list[RenameOperation], int]:
-    """Solo películas por ahora (v1) -- deliberado, no un olvido: proponer nombres de episodios
-    exige además reorganizar la carpeta de temporada, un diseño mayor que se deja para cuando
-    haya un caso de uso real de la Fase 5 (ver docs/ARCHITECTURE.md). Un item cuyo nombre no se
-    puede interpretar (parsear_nombre_pelicula devuelve None) se cuenta como "saltado" -- nunca
-    se inventa un título/año que el propio nombre no dice ya."""
-    operaciones = []
-    saltados = 0
-    for item in items:
-        info = parsear_nombre_pelicula(Path(item.current_path).stem)
-        if info is None:
-            saltados += 1
-            continue
-        entrada = MovieNamingInput(
-            title=info.title, year=info.year,
-            external_id_namespace=info.external_id_namespace, external_id_value=info.external_id_value,
-            edition=info.edition,
-        )
-        destino = f"{proponer_carpeta_pelicula(entrada)}/{proponer_archivo_pelicula(entrada, item.extension)}"
-        if destino != item.current_path:  # ya está en el nombre canónico -- nada que proponer
-            operaciones.append(RenameOperation(
-                item_id=item.id, source_path=item.current_path,
-                destination_path=destino, size_bytes=item.fingerprint.size_bytes,
-            ))
-    return operaciones, saltados
-
-
 def cmd_plan_rename(root: str, library_id: str, content_type: str, salida: str | None, as_json: bool) -> int:
     if content_type != "movie":
         print(
@@ -191,7 +156,7 @@ def cmd_plan_rename(root: str, library_id: str, content_type: str, salida: str |
         return 1
 
     items = escanear_directorio(ruta, library_id=library_id, content_type=ContentType.MOVIE)
-    operaciones, saltados = _proponer_operaciones_pelicula(items)
+    operaciones, saltados = proponer_operaciones_pelicula(items)
     inventory_hash = calcular_inventory_hash(items)
     plan = generar_plan_renombrado(operaciones, inventory_hash, authorized_root=ruta)
 
@@ -303,32 +268,6 @@ def cmd_providers_status(config_path: str, as_json: bool) -> int:
     return 0
 
 
-def _verificar_coincidencias_pelicula(items: list[InventoryItem]) -> list[dict[str, object]]:
-    """Sin ningún proveedor activo todavía (docs/DECISIONS.md #5), `candidatos` siempre es una
-    lista vacía -- por diseño del motor de coincidencias (matching/engine.py), esto significa que
-    TODO acaba en needs_review. No es un error: es el reflejo honesto de que activar un proveedor
-    es un paso previo real, no simulado."""
-    resultados: list[dict[str, object]] = []
-    for item in items:
-        info = parsear_nombre_pelicula(Path(item.current_path).stem)
-        if info is None:
-            resultados.append({
-                "path": item.current_path, "state": "sin_interpretar",
-                "score": 0.0, "reasons": ["nombre_no_interpretable"],
-            })
-            continue
-        evidencia = LocalEvidence(
-            parsed_title=info.title, parsed_year=info.year, entity_type="movie",
-            external_id_namespace=info.external_id_namespace, external_id_value=info.external_id_value,
-        )
-        decision = decidir_coincidencia(evidencia, [])
-        resultados.append({
-            "path": item.current_path, "state": decision.state.value,
-            "score": decision.score, "reasons": list(decision.reasons),
-        })
-    return resultados
-
-
 def cmd_match_check(root: str, library_id: str, content_type: str, as_json: bool) -> int:
     if content_type != "movie":
         print("✗ 'match check' de momento solo soporta --content-type movie", file=sys.stderr)
@@ -340,7 +279,7 @@ def cmd_match_check(root: str, library_id: str, content_type: str, as_json: bool
         return 1
 
     items = escanear_directorio(ruta, library_id=library_id, content_type=ContentType.MOVIE)
-    resultados = _verificar_coincidencias_pelicula(items)
+    resultados = verificar_coincidencias_pelicula(items)
 
     if as_json:
         print(json.dumps({"total": len(resultados), "results": resultados}, indent=2, ensure_ascii=False))

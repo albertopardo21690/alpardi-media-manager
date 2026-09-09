@@ -23,8 +23,11 @@ from __future__ import annotations
 import unicodedata
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
+from pathlib import Path
 
+from alpardi_media_manager.domain.models import InventoryItem
 from alpardi_media_manager.domain.states import ItemState
+from alpardi_media_manager.parsers.filename import parsear_nombre_pelicula
 from alpardi_media_manager.providers.models import SearchCandidate
 
 
@@ -148,3 +151,32 @@ def decidir_coincidencia(evidencia: LocalEvidence, candidatos: list[SearchCandid
         state=ItemState.MATCHED, candidate=mejor_candidato, score=mejor_score,
         reasons=("titulo_y_ano_coincidentes",),
     )
+
+
+def verificar_coincidencias_pelicula(items: list[InventoryItem]) -> list[dict[str, object]]:
+    """Sin ningún proveedor activo todavía (docs/DECISIONS.md #5), `candidatos` siempre es una
+    lista vacía -- por diseño de `decidir_coincidencia`, esto significa que TODO acaba en
+    needs_review. No es un error: es el reflejo honesto de que activar un proveedor es un paso
+    previo real, no simulado.
+
+    Vive aquí (no en cli/) para que tanto la CLI como el servidor MCP lo llamen desde la MISMA
+    fuente real -- son capas hermanas, ninguna debe depender de la otra (ver ARCHITECTURE.md)."""
+    resultados: list[dict[str, object]] = []
+    for item in items:
+        info = parsear_nombre_pelicula(Path(item.current_path).stem)
+        if info is None:
+            resultados.append({
+                "path": item.current_path, "state": "sin_interpretar",
+                "score": 0.0, "reasons": ["nombre_no_interpretable"],
+            })
+            continue
+        evidencia = LocalEvidence(
+            parsed_title=info.title, parsed_year=info.year, entity_type="movie",
+            external_id_namespace=info.external_id_namespace, external_id_value=info.external_id_value,
+        )
+        decision = decidir_coincidencia(evidencia, [])
+        resultados.append({
+            "path": item.current_path, "state": decision.state.value,
+            "score": decision.score, "reasons": list(decision.reasons),
+        })
+    return resultados

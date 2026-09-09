@@ -15,6 +15,12 @@ from pathlib import Path
 from typing import Any
 
 from alpardi_media_manager.domain.models import InventoryItem
+from alpardi_media_manager.parsers.filename import parsear_nombre_pelicula
+from alpardi_media_manager.policies.naming import (
+    MovieNamingInput,
+    proponer_archivo_pelicula,
+    proponer_carpeta_pelicula,
+)
 
 # Nombres reservados de Windows -- relevantes porque el ecosistema de Alberto incluye un PC
 # Windows que accede a estas rutas por red (ver docs/DECISIONS.md).
@@ -235,3 +241,33 @@ def guardar_plan(plan: Plan, ruta: Path) -> None:
 
 def cargar_plan(ruta: Path) -> Plan:
     return deserializar_plan(json.loads(ruta.read_text(encoding="utf-8")))
+
+
+def proponer_operaciones_pelicula(items: list[InventoryItem]) -> tuple[list[RenameOperation], int]:
+    """Solo películas por ahora (v1) -- deliberado, no un olvido: proponer nombres de episodios
+    exige además reorganizar la carpeta de temporada, un diseño mayor que se deja para cuando
+    haya un caso de uso real de la Fase 5 (ver docs/ARCHITECTURE.md). Un item cuyo nombre no se
+    puede interpretar (parsear_nombre_pelicula devuelve None) se cuenta como "saltado" -- nunca
+    se inventa un título/año que el propio nombre no dice ya.
+
+    Vive aquí (no en cli/) para que tanto la CLI como el servidor MCP lo llamen desde la MISMA
+    fuente real -- son capas hermanas, ninguna debe depender de la otra (ver ARCHITECTURE.md)."""
+    operaciones = []
+    saltados = 0
+    for item in items:
+        info = parsear_nombre_pelicula(Path(item.current_path).stem)
+        if info is None:
+            saltados += 1
+            continue
+        entrada = MovieNamingInput(
+            title=info.title, year=info.year,
+            external_id_namespace=info.external_id_namespace, external_id_value=info.external_id_value,
+            edition=info.edition,
+        )
+        destino = f"{proponer_carpeta_pelicula(entrada)}/{proponer_archivo_pelicula(entrada, item.extension)}"
+        if destino != item.current_path:  # ya está en el nombre canónico -- nada que proponer
+            operaciones.append(RenameOperation(
+                item_id=item.id, source_path=item.current_path,
+                destination_path=destino, size_bytes=item.fingerprint.size_bytes,
+            ))
+    return operaciones, saltados
