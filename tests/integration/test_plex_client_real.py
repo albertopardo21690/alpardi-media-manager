@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from alpardi_media_manager.cli.config import leer_plex_token, plex_base_url
+from alpardi_media_manager.config import leer_plex_token, plex_base_url
 from alpardi_media_manager.plex.client import PlexClient
 
 pytestmark = pytest.mark.integration

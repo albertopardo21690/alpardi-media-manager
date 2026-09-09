@@ -7,12 +7,12 @@ import shutil
 
 import pytest
 
-from alpardi_media_manager.cli.checks import (
+from alpardi_media_manager.config import leer_plex_token, nas_ssh_host, plex_base_url
+from alpardi_media_manager.diagnostics.checks import (
     CheckStatus,
     check_nas_ssh_reachable,
     check_plex_reachable,
 )
-from alpardi_media_manager.cli.config import leer_plex_token, nas_ssh_host, plex_base_url
 
 pytestmark = pytest.mark.integration
 

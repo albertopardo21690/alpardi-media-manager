@@ -3,7 +3,9 @@
 No es el sistema de configuración final (eso vendrá con config/config.yaml real + credential_ref
 completo) -- de momento solo resuelve lo necesario para que `doctor` funcione de verdad contra el
 Plex y el NAS reales, reutilizando el token ya existente sin duplicarlo.
-"""
+
+Vive en la raíz del paquete (no en `cli/`) porque tanto la CLI como el servidor MCP lo necesitan
+por igual -- son capas hermanas, ninguna debe depender de la otra (ver ARCHITECTURE.md)."""
 from __future__ import annotations
 
 import os

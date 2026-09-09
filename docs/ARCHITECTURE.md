@@ -30,6 +30,13 @@ capa solo puede depender de las que están por debajo en esta lista — nunca al
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+`mcp/server.py` expone deliberadamente MENOS que la CLI: solo las 6 herramientas de solo lectura
+(`doctor`, `plex_libraries`, `inventory_scan`, `providers_status`, `match_check`,
+`plan_rename_preview`). `apply`, `rollback` y `backup create` existen solo como skills con
+`disable-model-invocation: true` que invocan la CLI real -- nunca como herramientas MCP, porque
+una herramienta MCP SÍ es invocable por el propio modelo sin que Alberto escriba nada (ver
+docs/SECURITY.md para el razonamiento completo).
+
 ## Por qué esta separación
 
 - **`domain/` no importa nada de fuera de sí mismo.** Es la única capa que otros pueden asumir
@@ -70,5 +77,6 @@ de fondo del encargo aunque no se ejecute literalmente "en el NAS".
 | `reports/` | Informes probados (Markdown/JSON/CSV): plan, resultado de aplicación/reversión, inventario | `plan_report.py`, `transaction_report.py`, `inventory_report.py` |
 | `cli/` | `doctor`, `plex inspect`, `inventory scan`, `export`, `rollback`, `plan rename`, `apply`, `providers status`, `match check`, `backup create`/`backup verify` -- todos reales y probados (unit + integración real contra Plex/NAS). `plan rename`/`apply` son dos invocaciones de proceso separadas que solo comparten el plan como JSON en disco (`planning/plan.py`: `guardar_plan`/`cargar_plan`), tal como pasa en el uso real. v1 solo cubre películas (`content_type=movie`); TV/música quedan para un incremento posterior | `main.py`, `checks.py`, `config.py` |
 | `backup/` | Copia de `plans/`/`journals/`/`reports/`/`config/*.yaml` reales (nunca de los medios) con sha256 + verificación real (extrae de verdad, no solo comprueba que el fichero existe); probado | `engine.py` |
-| `mcp/` | No empezado | — |
-| `.claude/skills/`, `.claude/hooks/` | No empezado | — |
+| `mcp/` | Servidor stdio real, 6 herramientas DELIBERADAMENTE de solo lectura (nunca `apply`/`rollback`/`backup create` -- ver docs/SECURITY.md); probado con una prueba de integración real que habla el protocolo MCP de verdad con el SDK oficial (subprocess + `ClientSession`) | `server.py` |
+| `.claude/hooks/` | 2 hooks `PreToolUse` reales (bloqueo de Bash peligroso + escritura directa sobre extensiones multimedia), probados con 22 tests que invocan los scripts tal cual los invoca Claude Code | `pre_tool_use_bash_guard.py`, `pre_tool_use_media_write_guard.py` |
+| `.claude/skills/` | En marcha | — |

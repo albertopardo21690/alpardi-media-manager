@@ -1,7 +1,7 @@
 import subprocess
 from unittest.mock import Mock
 
-from alpardi_media_manager.cli.checks import (
+from alpardi_media_manager.diagnostics.checks import (
     CheckStatus,
     check_binary_present,
     check_nas_ssh_reachable,

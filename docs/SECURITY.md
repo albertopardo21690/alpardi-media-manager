@@ -29,15 +29,24 @@ cuando el usuario lo autorice explícitamente).
 
 ## Claude Code
 
-- `/plex-apply`, `/plex-rollback` y cualquier skill con efectos llevarán
-  `disable-model-invocation: true` (confirmado como mecanismo real vigente, ver `docs/SOURCES.md`)
-  — invocables solo por Alberto, nunca automáticamente por el modelo.
-- Los hooks `PreToolUse` (pendientes, Fase 4) bloquearán `rm`, `mv`, `cp`, `rsync --delete`,
-  `find -delete` y escrituras directas sobre raíces multimedia, salvo la ruta controlada por el
-  motor transaccional con un plan autorizado — la regla vive en código y en hooks, no solo en
-  instrucciones de texto.
-- El servidor MCP (pendiente, Fase 4) no expondrá ninguna herramienta de shell arbitraria ni de
-  URL arbitraria — solo herramientas tipadas y centradas en intenciones concretas.
+- `/plex-apply` y `/plex-rollback` llevan `disable-model-invocation: true` (confirmado como
+  mecanismo real vigente, ver `docs/SOURCES.md`) — invocables solo por Alberto escribiendo el
+  comando él mismo, nunca automáticamente por el modelo. Son las dos únicas skills que mutan la
+  colección multimedia real.
+- Los hooks `PreToolUse` bloquean `rm`, `mv`, `cp`, `rsync --delete`, `find -delete` y escrituras
+  directas sobre raíces multimedia vía `Bash`, salvo la ruta controlada por el motor transaccional
+  con un plan autorizado — la regla vive en código (`.claude/settings.json` + script del hook), no
+  solo en instrucciones de texto. Ver `docs/OPERATIONS.md` para el detalle probado.
+- **Decisión de diseño del servidor MCP (`mcp/server.py`)**: expone solo 6 herramientas
+  DELIBERADAMENTE de solo lectura (`doctor`, `plex_libraries`, `inventory_scan`,
+  `providers_status`, `match_check`, `plan_rename_preview`) — ninguna escribe un byte en disco, ni
+  siquiera un plan. `apply`, `rollback` y `backup create` NUNCA se exponen como herramientas MCP:
+  a diferencia de una skill con `disable-model-invocation: true`, una herramienta MCP SÍ es
+  invocable por el propio modelo sin que Alberto escriba nada — exponer una operación mutadora ahí
+  habría abierto exactamente el camino de autoautorización que el encargo prohíbe. Esas tres
+  operaciones solo existen como skills gestionadas por Alberto, que a su vez llaman a la CLI real.
+  Probado con una prueba de integración real (`tests/integration/test_mcp_server_real.py`) que
+  confirma la lista de herramientas expuestas y que ninguna herramienta prohibida aparece nunca.
 
 ## Incidente relevante de este mismo entorno (contexto, no un fallo de este proyecto)
 

@@ -12,8 +12,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from alpardi_media_manager.backup.engine import crear_backup, verificar_backup
-from alpardi_media_manager.cli.checks import CheckStatus, run_all_checks
-from alpardi_media_manager.cli.config import leer_plex_token, nas_ssh_host, plex_base_url
+from alpardi_media_manager.config import leer_plex_token, nas_ssh_host, plex_base_url
+from alpardi_media_manager.diagnostics.checks import CheckStatus, run_all_checks
 from alpardi_media_manager.domain.models import ContentType
 from alpardi_media_manager.inventory.scanner import escanear_directorio
 from alpardi_media_manager.matching.engine import verificar_coincidencias_pelicula

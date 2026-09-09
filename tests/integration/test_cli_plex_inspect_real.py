@@ -3,8 +3,8 @@ import json
 
 import pytest
 
-from alpardi_media_manager.cli.config import leer_plex_token
 from alpardi_media_manager.cli.main import main
+from alpardi_media_manager.config import leer_plex_token
 
 pytestmark = pytest.mark.integration
 
