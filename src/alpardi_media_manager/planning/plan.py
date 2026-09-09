@@ -5,12 +5,16 @@ exclusiva de `transactions/`, y solo tras la frase de autorización exacta.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import unicodedata
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+
+from alpardi_media_manager.domain.models import InventoryItem
 
 # Nombres reservados de Windows -- relevantes porque el ecosistema de Alberto incluye un PC
 # Windows que accede a estas rutas por red (ver docs/DECISIONS.md).
@@ -158,3 +162,76 @@ def verificar_frase_autorizacion(frase: str, plan: Plan, inventory_hash_actual: 
     if not plan.is_safe_to_apply:
         return False, f"El plan tiene {len(plan.conflicts)} conflicto(s) sin resolver -- no se puede aplicar"
     return True, "autorización válida"
+
+
+def calcular_inventory_hash(items: list[InventoryItem]) -> str:
+    """Huella reproducible de un inventario completo -- mismos archivos, mismo hash, en DOS
+    ESCANEOS DISTINTOS (dos procesos de la CLI: uno para `plan rename`, otro para `apply`). Si un
+    solo archivo cambia de tamaño/mtime/contenido, el hash cambia. Es lo que hace real la
+    detección de "el inventario cambió desde que se generó el plan" (`verificar_frase_autorizacion`
+    de arriba).
+
+    Deliberadamente NO se usa `item.id` -- es un UUID generado al azar en cada `InventoryItem`
+    nuevo, así que dos escaneos independientes del MISMO archivo real siempre darían un id
+    distinto, y el hash nunca coincidiría entre "plan rename" y "apply" aunque nada hubiera
+    cambiado de verdad. Solo `current_path` + `fingerprint.quick` son estables entre escaneos."""
+    partes = sorted(
+        f"{item.current_path}:{item.fingerprint.quick}"
+        for item in items
+    )
+    return hashlib.sha256("\n".join(partes).encode("utf-8")).hexdigest()
+
+
+def serializar_plan(plan: Plan) -> dict[str, Any]:
+    """Representación JSON-compatible de un plan completo (incluidos los conflictos ya
+    detectados) -- para poder guardarlo en disco entre "generar_plan_renombrado" y
+    "aplicar_plan", que en la CLI real ocurren en dos invocaciones de proceso distintas."""
+    return {
+        "plan_id": plan.plan_id,
+        "created_at": plan.created_at.isoformat(),
+        "inventory_hash": plan.inventory_hash,
+        "operations": [
+            {
+                "item_id": str(op.item_id),
+                "source_path": op.source_path,
+                "destination_path": op.destination_path,
+                "size_bytes": op.size_bytes,
+            }
+            for op in plan.operations
+        ],
+        "conflicts": [
+            {"operation_index": c.operation_index, "kind": c.kind, "detail": c.detail}
+            for c in plan.conflicts
+        ],
+    }
+
+
+def deserializar_plan(datos: dict[str, Any]) -> Plan:
+    """Inversa de `serializar_plan` -- reconstruye el Plan tal cual, SIN volver a detectar
+    conflictos (los conflictos ya detectados se conservan; si se quiere recomprobar contra el
+    filesystem actual, hay que volver a generar el plan con `generar_plan_renombrado`, no
+    confiar ciegamente en un JSON antiguo para eso)."""
+    return Plan(
+        plan_id=datos["plan_id"],
+        created_at=datetime.fromisoformat(datos["created_at"]),
+        inventory_hash=datos["inventory_hash"],
+        operations=tuple(
+            RenameOperation(
+                item_id=uuid.UUID(op["item_id"]), source_path=op["source_path"],
+                destination_path=op["destination_path"], size_bytes=op["size_bytes"],
+            )
+            for op in datos["operations"]
+        ),
+        conflicts=tuple(
+            PlanConflict(operation_index=c["operation_index"], kind=c["kind"], detail=c["detail"])
+            for c in datos.get("conflicts", [])
+        ),
+    )
+
+
+def guardar_plan(plan: Plan, ruta: Path) -> None:
+    ruta.write_text(json.dumps(serializar_plan(plan), indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def cargar_plan(ruta: Path) -> Plan:
+    return deserializar_plan(json.loads(ruta.read_text(encoding="utf-8")))

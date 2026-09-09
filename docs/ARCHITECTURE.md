@@ -67,6 +67,6 @@ de fondo del encargo aunque no se ejecute literalmente "en el NAS".
 | `transactions/` | Motor de aplicación probado (132 tests en el proyecto), revisado adversarialmente por 4 ángulos de seguridad independientes (2026-09-09): 14 hallazgos, los 4 críticos corregidos + 7 más (11/14 en total); 3 de severidad baja/media documentados como límite conocido en el propio docstring del módulo, no ocultados | `engine.py` |
 | `plex/` | Adaptador solo lectura probado (unitario + integración real contra el Plex de Alberto) | `models.py`, `client.py` |
 | `reports/` | Informes probados (Markdown/JSON/CSV): plan, resultado de aplicación/reversión, inventario | `plan_report.py`, `transaction_report.py`, `inventory_report.py` |
-| `cli/` | `doctor`, `plex inspect`, `inventory scan`, `export`, `rollback` -- todos reales y probados (unit + integración real contra Plex/NAS). Faltan `plan`/`apply` (necesitan un formato de plan serializable en disco, pendiente) | `main.py`, `checks.py`, `config.py` |
+| `cli/` | `doctor`, `plex inspect`, `inventory scan`, `export`, `rollback`, `plan rename`, `apply` -- todos reales y probados (unit + integración real contra Plex/NAS). `plan rename`/`apply` son dos invocaciones de proceso separadas que solo comparten el plan como JSON en disco (`planning/plan.py`: `guardar_plan`/`cargar_plan`), tal como pasa en el uso real. v1 solo cubre películas (`content_type=movie`); TV/música quedan para un incremento posterior | `main.py`, `checks.py`, `config.py` |
 | `mcp/` | No empezado | — |
 | `.claude/skills/`, `.claude/hooks/` | No empezado | — |
