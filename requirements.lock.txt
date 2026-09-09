@@ -21,5 +21,6 @@ pytest==9.1.1
 pytest-asyncio==1.4.0
 PyYAML==6.0.3
 ruff==0.16.6
+types-PyYAML==6.0.12.20260906
 typing-inspection==0.4.4
 typing_extensions==4.16.0
