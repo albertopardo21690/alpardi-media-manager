@@ -10,6 +10,7 @@ capa solo puede depender de las que están por debajo en esta lista — nunca al
 │ CLI (humana + --json)          │  MCP stdio (herramientas tipadas)│
 ├─────────────────────────────────────────────────────────────────┤
 │ Informes y observabilidad (reports/) -- logs, métricas, diagnóstico│
+│ Copia de seguridad (backup/) -- plans/journals/reports/config, nunca medios│
 ├─────────────────────────────────────────────────────────────────┤
 │ Motor transaccional (transactions/) -- journal, aplicación, rollback│
 │ Planificador (planning/) -- planes inmutables, nunca toca archivos │
@@ -58,15 +59,16 @@ de fondo del encargo aunque no se ejecute literalmente "en el NAS".
 | Capa | Estado | Módulos con código real |
 |---|---|---|
 | `domain/` | Núcleo probado | `models.py`, `states.py` |
-| `providers/` | Contrato probado, sin adaptadores concretos | `base.py`, `models.py` |
+| `providers/` | Contrato probado, sin adaptadores concretos; estado de configuración (`enabled`/`credential_ref`, solo lectura del YAML, cero red) probado | `base.py`, `models.py`, `status.py` |
 | `inventory/` | Núcleo probado (huellas, sidecars, escáner con protección anti-symlink) | `fingerprint.py`, `sidecars.py`, `scanner.py` |
 | `parsers/` | Interpretación de nombres probada | `filename.py` |
 | `policies/` | Generación de nombres probada (nunca renombra) | `naming.py` |
-| `matching/` | Motor de coincidencias probado, las 6 reglas innegociables cubiertas | `engine.py` |
+| `matching/` | Motor de coincidencias probado, las 6 reglas innegociables cubiertas; ahora conectado a la CLI (`match check`) con lista de candidatos vacía mientras no haya proveedores activos -- todo resulta honestamente `needs_review`, nunca una coincidencia inventada | `engine.py` |
 | `planning/` | Planes inmutables + detección de conflictos + frase de autorización, probado | `plan.py` |
 | `transactions/` | Motor de aplicación probado (132 tests en el proyecto), revisado adversarialmente por 4 ángulos de seguridad independientes (2026-09-09): 14 hallazgos, los 4 críticos corregidos + 7 más (11/14 en total); 3 de severidad baja/media documentados como límite conocido en el propio docstring del módulo, no ocultados | `engine.py` |
 | `plex/` | Adaptador solo lectura probado (unitario + integración real contra el Plex de Alberto) | `models.py`, `client.py` |
 | `reports/` | Informes probados (Markdown/JSON/CSV): plan, resultado de aplicación/reversión, inventario | `plan_report.py`, `transaction_report.py`, `inventory_report.py` |
-| `cli/` | `doctor`, `plex inspect`, `inventory scan`, `export`, `rollback`, `plan rename`, `apply` -- todos reales y probados (unit + integración real contra Plex/NAS). `plan rename`/`apply` son dos invocaciones de proceso separadas que solo comparten el plan como JSON en disco (`planning/plan.py`: `guardar_plan`/`cargar_plan`), tal como pasa en el uso real. v1 solo cubre películas (`content_type=movie`); TV/música quedan para un incremento posterior | `main.py`, `checks.py`, `config.py` |
+| `cli/` | `doctor`, `plex inspect`, `inventory scan`, `export`, `rollback`, `plan rename`, `apply`, `providers status`, `match check`, `backup create`/`backup verify` -- todos reales y probados (unit + integración real contra Plex/NAS). `plan rename`/`apply` son dos invocaciones de proceso separadas que solo comparten el plan como JSON en disco (`planning/plan.py`: `guardar_plan`/`cargar_plan`), tal como pasa en el uso real. v1 solo cubre películas (`content_type=movie`); TV/música quedan para un incremento posterior | `main.py`, `checks.py`, `config.py` |
+| `backup/` | Copia de `plans/`/`journals/`/`reports/`/`config/*.yaml` reales (nunca de los medios) con sha256 + verificación real (extrae de verdad, no solo comprueba que el fichero existe); probado | `engine.py` |
 | `mcp/` | No empezado | — |
 | `.claude/skills/`, `.claude/hooks/` | No empezado | — |

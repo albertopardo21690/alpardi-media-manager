@@ -8,12 +8,15 @@ import argparse
 import asyncio
 import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
+from alpardi_media_manager.backup.engine import crear_backup, verificar_backup
 from alpardi_media_manager.cli.checks import CheckStatus, run_all_checks
 from alpardi_media_manager.cli.config import leer_plex_token, nas_ssh_host, plex_base_url
 from alpardi_media_manager.domain.models import ContentType, InventoryItem
 from alpardi_media_manager.inventory.scanner import escanear_directorio
+from alpardi_media_manager.matching.engine import LocalEvidence, decidir_coincidencia
 from alpardi_media_manager.parsers.filename import parsear_nombre_pelicula
 from alpardi_media_manager.planning.plan import (
     RenameOperation,
@@ -28,6 +31,7 @@ from alpardi_media_manager.policies.naming import (
     proponer_archivo_pelicula,
     proponer_carpeta_pelicula,
 )
+from alpardi_media_manager.providers.status import leer_estado_proveedores
 from alpardi_media_manager.reports.inventory_report import (
     inventario_a_csv,
     inventario_a_json,
@@ -271,6 +275,118 @@ def cmd_rollback(transaction_id: str, root: str, as_json: bool) -> int:
     return 0 if resultado.completa else 1
 
 
+def cmd_providers_status(config_path: str, as_json: bool) -> int:
+    try:
+        estado = leer_estado_proveedores(Path(config_path))
+    except FileNotFoundError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 1
+
+    if as_json:
+        print(json.dumps({
+            "config_path": str(estado.config_path),
+            "is_template": estado.is_template,
+            "providers": [
+                {"provider": p.provider, "enabled": p.enabled, "has_credential_ref": p.has_credential_ref}
+                for p in estado.providers
+            ],
+        }, indent=2, ensure_ascii=False))
+    else:
+        if estado.is_template:
+            print(f"⚠ Mostrando la PLANTILLA ({estado.config_path}), no una configuración real activa\n")
+        for p in estado.providers:
+            marca = "habilitado" if p.enabled else "deshabilitado"
+            cred = "con credential_ref" if p.has_credential_ref else "sin credencial configurada"
+            print(f"  - {p.provider}: {marca} ({cred})")
+        habilitados = sum(1 for p in estado.providers if p.enabled)
+        print(f"\n{habilitados}/{len(estado.providers)} proveedores habilitados.")
+    return 0
+
+
+def _verificar_coincidencias_pelicula(items: list[InventoryItem]) -> list[dict[str, object]]:
+    """Sin ningún proveedor activo todavía (docs/DECISIONS.md #5), `candidatos` siempre es una
+    lista vacía -- por diseño del motor de coincidencias (matching/engine.py), esto significa que
+    TODO acaba en needs_review. No es un error: es el reflejo honesto de que activar un proveedor
+    es un paso previo real, no simulado."""
+    resultados: list[dict[str, object]] = []
+    for item in items:
+        info = parsear_nombre_pelicula(Path(item.current_path).stem)
+        if info is None:
+            resultados.append({
+                "path": item.current_path, "state": "sin_interpretar",
+                "score": 0.0, "reasons": ["nombre_no_interpretable"],
+            })
+            continue
+        evidencia = LocalEvidence(
+            parsed_title=info.title, parsed_year=info.year, entity_type="movie",
+            external_id_namespace=info.external_id_namespace, external_id_value=info.external_id_value,
+        )
+        decision = decidir_coincidencia(evidencia, [])
+        resultados.append({
+            "path": item.current_path, "state": decision.state.value,
+            "score": decision.score, "reasons": list(decision.reasons),
+        })
+    return resultados
+
+
+def cmd_match_check(root: str, library_id: str, content_type: str, as_json: bool) -> int:
+    if content_type != "movie":
+        print("✗ 'match check' de momento solo soporta --content-type movie", file=sys.stderr)
+        return 1
+
+    ruta = Path(root)
+    if not ruta.is_dir():
+        print(f"✗ La raíz no existe o no es un directorio: {ruta}", file=sys.stderr)
+        return 1
+
+    items = escanear_directorio(ruta, library_id=library_id, content_type=ContentType.MOVIE)
+    resultados = _verificar_coincidencias_pelicula(items)
+
+    if as_json:
+        print(json.dumps({"total": len(resultados), "results": resultados}, indent=2, ensure_ascii=False))
+    else:
+        print(
+            "⚠ 0 proveedores activos todavía: todo aparecerá como 'needs_review' o "
+            "'sin_interpretar' hasta activar al menos uno (ver `providers status`).\n"
+        )
+        for r in resultados:
+            razones = ", ".join(r["reasons"])  # type: ignore[arg-type]
+            print(f"  - {r['path']}: {r['state']} ({razones})")
+        revisar = sum(1 for r in resultados if r["state"] != "matched")
+        print(f"\n{len(resultados)} elemento(s), {revisar} necesitan revisión.")
+    return 0
+
+
+def cmd_backup_create(raiz_proyecto: str, directorio_salida: str, as_json: bool) -> int:
+    resultado = crear_backup(Path(raiz_proyecto), Path(directorio_salida), datetime.now(UTC))
+
+    if as_json:
+        print(json.dumps({
+            "archive_path": str(resultado.archive_path),
+            "sha256_path": str(resultado.sha256_path),
+            "file_count": resultado.file_count,
+            "total_bytes": resultado.total_bytes,
+            "sha256": resultado.sha256,
+        }, indent=2, ensure_ascii=False))
+    else:
+        print(f"✓ Backup creado: {resultado.archive_path}")
+        print(f"  {resultado.file_count} archivo(s), {resultado.total_bytes} bytes, sha256={resultado.sha256}")
+        if resultado.file_count == 0:
+            print("  (0 archivos es normal si todavía no se ha aplicado ningún plan real -- ver docs/BACKUP_RESTORE.md)")
+    return 0
+
+
+def cmd_backup_verify(archive: str, as_json: bool) -> int:
+    resultado = verificar_backup(Path(archive))
+
+    if as_json:
+        print(json.dumps({"ok": resultado.ok, "detail": resultado.detail}, indent=2, ensure_ascii=False))
+    else:
+        simbolo = "✓" if resultado.ok else "✗"
+        print(f"{simbolo} {resultado.detail}")
+    return 0 if resultado.ok else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="alpardi-media")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -320,6 +436,30 @@ def build_parser() -> argparse.ArgumentParser:
     p_rollback.add_argument("--root", required=True, help="authorized_root usado al aplicar")
     p_rollback.add_argument("--json", action="store_true", dest="as_json")
 
+    p_providers = sub.add_parser("providers", help="Estado configurado de los proveedores (solo lectura, sin red)")
+    sub_providers = p_providers.add_subparsers(dest="providers_command", required=True)
+    p_providers_status = sub_providers.add_parser("status", help="Lista qué proveedores están habilitados/deshabilitados")
+    p_providers_status.add_argument("--config", default="config/providers.yaml", dest="config_path")
+    p_providers_status.add_argument("--json", action="store_true", dest="as_json")
+
+    p_match = sub.add_parser("match", help="Coincidencias locales (sin llamar a ningún proveedor todavía)")
+    sub_match = p_match.add_subparsers(dest="match_command", required=True)
+    p_match_check = sub_match.add_parser("check", help="Evalúa el estado de coincidencia local de cada elemento (solo movie por ahora)")
+    p_match_check.add_argument("root")
+    p_match_check.add_argument("--library-id", required=True)
+    p_match_check.add_argument("--content-type", required=True)
+    p_match_check.add_argument("--json", action="store_true", dest="as_json")
+
+    p_backup = sub.add_parser("backup", help="Copia de seguridad de plans/journals/reports/config -- nunca de los medios")
+    sub_backup = p_backup.add_subparsers(dest="backup_command", required=True)
+    p_backup_create = sub_backup.add_parser("create", help="Crea un backup con sha256")
+    p_backup_create.add_argument("--root", default=".", dest="raiz_proyecto", help="Raíz del proyecto (por defecto, el directorio actual)")
+    p_backup_create.add_argument("-o", "--output", default="backups", dest="directorio_salida")
+    p_backup_create.add_argument("--json", action="store_true", dest="as_json")
+    p_backup_verify = sub_backup.add_parser("verify", help="Recalcula el sha256 y extrae de verdad para confirmar integridad")
+    p_backup_verify.add_argument("archive")
+    p_backup_verify.add_argument("--json", action="store_true", dest="as_json")
+
     return parser
 
 
@@ -340,6 +480,14 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_apply(args.plan_path, args.root, args.library_id, args.content_type, args.autorizacion, args.as_json)
     if args.command == "rollback":
         return cmd_rollback(args.transaction_id, args.root, args.as_json)
+    if args.command == "providers" and args.providers_command == "status":
+        return cmd_providers_status(args.config_path, args.as_json)
+    if args.command == "match" and args.match_command == "check":
+        return cmd_match_check(args.root, args.library_id, args.content_type, args.as_json)
+    if args.command == "backup" and args.backup_command == "create":
+        return cmd_backup_create(args.raiz_proyecto, args.directorio_salida, args.as_json)
+    if args.command == "backup" and args.backup_command == "verify":
+        return cmd_backup_verify(args.archive, args.as_json)
 
     return 2  # inalcanzable con argparse subparsers required=True, pero explícito en vez de silencioso
 

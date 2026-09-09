@@ -6,10 +6,14 @@ import pytest
 
 from alpardi_media_manager.cli.main import (
     cmd_apply,
+    cmd_backup_create,
+    cmd_backup_verify,
     cmd_export,
     cmd_inventory_scan,
+    cmd_match_check,
     cmd_plan_rename,
     cmd_plex_inspect,
+    cmd_providers_status,
     cmd_rollback,
     main,
 )
@@ -172,6 +176,73 @@ def test_apply_fichero_de_plan_inexistente(tmp_path: Path, capsys: pytest.Captur
     codigo = cmd_apply(str(tmp_path / "no_existe.json"), str(tmp_path), "lib", "movie", "frase", as_json=False)
     assert codigo == 1
     assert "No existe" in capsys.readouterr().err
+
+
+# --- providers status --------------------------------------------------------------------------
+
+def test_providers_status_config_inexistente(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    codigo = cmd_providers_status(str(tmp_path / "no_existe.yaml"), as_json=False)
+    assert codigo == 1
+    assert "No existe" in capsys.readouterr().err
+
+
+def test_providers_status_real(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    (tmp_path / "providers.yaml").write_text(
+        "providers:\n  tmdb:\n    enabled: false\n  musicbrainz:\n    enabled: true\n    credential_ref: x\n",
+        encoding="utf-8",
+    )
+    codigo = cmd_providers_status(str(tmp_path / "providers.yaml"), as_json=True)
+    assert codigo == 0
+    salida = json.loads(capsys.readouterr().out)
+    assert salida["is_template"] is False
+    assert len(salida["providers"]) == 2
+
+
+# --- match check ---------------------------------------------------------------------------------
+
+def test_match_check_rechaza_content_type_no_movie(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    codigo = cmd_match_check(str(tmp_path), "lib", "tv_episode", as_json=False)
+    assert codigo == 1
+    assert "movie" in capsys.readouterr().err
+
+
+def test_match_check_sin_proveedores_todo_es_needs_review_o_sin_interpretar(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str],
+):
+    (tmp_path / "7 minutos (2009).mkv").write_bytes(b"x")
+    (tmp_path / "nombre_raro.mkv").write_bytes(b"x")
+
+    codigo = cmd_match_check(str(tmp_path), "lib", "movie", as_json=True)
+    assert codigo == 0
+    salida = json.loads(capsys.readouterr().out)
+    assert salida["total"] == 2
+    estados = {r["state"] for r in salida["results"]}
+    assert estados <= {"needs_review", "sin_interpretar"}
+
+
+# --- backup create / verify ----------------------------------------------------------------------
+
+def test_backup_create_y_verify_end_to_end(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    raiz = tmp_path / "proyecto"
+    (raiz / "plans").mkdir(parents=True)
+    (raiz / "plans" / "plan_1.json").write_text('{"plan_id": "x"}', encoding="utf-8")
+    salida_backups = tmp_path / "backups"
+
+    codigo = cmd_backup_create(str(raiz), str(salida_backups), as_json=True)
+    assert codigo == 0
+    resultado = json.loads(capsys.readouterr().out)
+    assert resultado["file_count"] == 1
+
+    codigo = cmd_backup_verify(resultado["archive_path"], as_json=True)
+    assert codigo == 0
+    verificacion = json.loads(capsys.readouterr().out)
+    assert verificacion["ok"] is True
+
+
+def test_backup_verify_fichero_inexistente(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    codigo = cmd_backup_verify(str(tmp_path / "no_existe.tar.gz"), as_json=False)
+    assert codigo == 1
+    assert "No existe" in capsys.readouterr().out
 
 
 # --- plex inspect: solo el camino de error, sin red (el camino real está en integration/) ------

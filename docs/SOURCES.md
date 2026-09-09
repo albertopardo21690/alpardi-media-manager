@@ -24,7 +24,9 @@ concreto, no antes.
 
 | Fuente | Fecha | Qué se verificó | Regla aplicada |
 |---|---|---|---|
-| [Skills](https://code.claude.com/docs/en/skills) | 2026-09-09 | `disable-model-invocation: true` en el frontmatter YAML de `SKILL.md` es el mecanismo real y vigente para que una skill sea invocable solo por el usuario (`/comando`), nunca por el modelo automáticamente; además su descripción ni siquiera se carga en el contexto de Claude | `/plex-apply`, `/plex-rollback` y cualquier skill con efectos llevarán este flag — confirmado, no asumido |
+| [Skills](https://code.claude.com/docs/en/skills) | 2026-09-09 | `disable-model-invocation: true` en el frontmatter YAML de `SKILL.md` es el mecanismo real y vigente para que una skill sea invocable solo por el usuario (`/comando`), nunca por el modelo automáticamente; además su descripción ni siquiera se carga en el contexto de Claude. Estructura real: `.claude/skills/<nombre>/SKILL.md`, comando derivado del nombre de carpeta | `/plex-apply`, `/plex-rollback` y cualquier skill con efectos llevan este flag — confirmado, no asumido |
+| [MCP](https://code.claude.com/docs/en/mcp) | 2026-09-09 | Formato real de `.mcp.json` para un servidor stdio local: `{"mcpServers": {"nombre": {"command": ..., "args": [...], "env": {...}}}}`; `${CLAUDE_PROJECT_DIR}` es la variable estable para referenciar el ejecutable sin ruta absoluta fija; Claude Code descubre `.mcp.json` en la raíz del proyecto automáticamente pero pide aprobación interactiva la primera vez (`claude mcp reset-project-choices` para reiniciarla) | El servidor MCP se referencia con `${CLAUDE_PROJECT_DIR}/.venv/bin/python` + el módulo del servidor, nunca una ruta absoluta fija que rompería si el proyecto se mueve |
+| [Hooks guide](https://code.claude.com/docs/en/hooks-guide) | 2026-09-09 | `PreToolUse` recibe `tool_name`+`tool_input.command` (para `Bash`) por stdin; exit 2 + mensaje en stderr bloquea con ese mensaje como feedback a Claude; salida JSON con `hookSpecificOutput.permissionDecision: "deny"` + `permissionDecisionReason` es la forma estructurada equivalente; el matcher de `PreToolUse` filtra por nombre de herramienta (`Bash`); hooks van en `.claude/settings.json` (proyecto, compartible) | Los hooks de Fase 4 usan `matcher: "Bash"` + exit 2 con mensaje claro en stderr — la forma más simple y ya confirmada como soportada, evita depender de un parseo JSON extra dentro del propio hook |
 
 ## Pendientes de consulta (no bloquean el scaffold inicial)
 
@@ -34,8 +36,6 @@ concreto, no antes.
   si hay bibliotecas de música en el lote piloto).
 - AniList/AniDB/Trakt/Wikidata/TheSportsDB/OMDb/IMDb: no se consultan todavía — ninguno forma parte
   del perfil B aprobado ni hay contenido confirmado que los necesite hoy.
-- `code.claude.com/docs/en/mcp` y `.../hooks-guide`: se consultarán antes de escribir el servidor
-  MCP y los hooks reales (Fase 4), no antes.
 - Recursos locales de películas/series, NFO, subtítulos, extras, `.plexignore`, ISO/VIDEO_TS: se
-  consultarán cuando se diseñen esos módulos concretos en Fase 3, para no bloquear el scaffold con
-  una consulta masiva de 20+ URLs de golpe.
+  consultarán cuando se diseñen esos módulos concretos, para no bloquear el scaffold con una
+  consulta masiva de 20+ URLs de golpe.
