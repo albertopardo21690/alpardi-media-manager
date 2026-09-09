@@ -39,3 +39,36 @@ script exactamente como lo hace Claude Code -- JSON por stdin, veredicto por có
 Verificar que Claude Code los ha cargado: `/hooks` dentro de una sesión en este proyecto, o
 `claude doctor` desde `/opt/alpardi-media-manager`. Límite conocido y documentado en el propio
 docstring de cada script: es un análisis léxico best-effort, no un sandbox -- ver `docs/SECURITY.md`.
+
+## Verificación real de la integración con Claude Code (Fase 4, 2026-09-09)
+
+Comandos oficiales usados para confirmar que Claude Code carga de verdad `CLAUDE.md`, las 9
+skills y el servidor MCP -- no solo que los ficheros existen con el formato correcto:
+
+```bash
+cd /opt/alpardi-media-manager
+CLAUDE_PROJECT_DIR="$(pwd)" claude doctor        # confirma .mcp.json y settings.json válidos
+CLAUDE_PROJECT_DIR="$(pwd)" claude mcp list      # confirma que "alpardimedia-manager" aparece
+CLAUDE_PROJECT_DIR="$(pwd)" claude -p "..." --strict-mcp-config   # ver resultado real abajo
+```
+
+Resultados reales obtenidos (versión de Claude Code instalada: 2.1.258):
+
+- `claude doctor`: sin `CLAUDE_PROJECT_DIR` puesto a mano avisa de que `.mcp.json` referencia esa
+  variable (correcto -- Claude Code la define solo dentro de una sesión real); con la variable
+  puesta, "No installation issues found."
+- `claude mcp list`: `alpardimedia-manager` aparece como `⏸ Pending approval (run 'claude' to
+  approve)` -- exactamente el comportamiento documentado para un servidor de proyecto nuevo
+  (aprobación interactiva la primera vez, ver `docs/SOURCES.md`). Alberto debe aprobarlo una vez
+  al abrir una sesión real aquí.
+- `claude -p` pidiendo listar las skills disponibles: devolvió las 7 skills normales
+  (`plex-audit`, `plex-backup`, `plex-doctor`, `plex-inventory`, `plex-plan`, `plex-providers`,
+  `plex-search`) -- **`plex-apply` y `plex-rollback` NO aparecieron**, confirmando en vivo (no
+  solo por documentación) que `disable-model-invocation: true` hace que su descripción ni
+  siquiera llegue al contexto del modelo.
+- `claude -p` preguntando por una regla concreta de `CLAUDE.md` (el único componente con permiso
+  real de escritura, y el formato exacto de la frase de autorización): respondió correctamente
+  con datos que solo puede tener si `CLAUDE.md` se cargó de verdad.
+
+Repetir esta pasada si se añade/quita una skill o se cambia `.mcp.json`/`settings.json` -- no dar
+por hecho que Claude Code los recoge solo porque el fichero tiene el formato correcto.
