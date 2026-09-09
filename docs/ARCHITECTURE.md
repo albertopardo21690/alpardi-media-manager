@@ -65,7 +65,8 @@ de fondo del encargo aunque no se ejecute literalmente "en el NAS".
 | `matching/` | Motor de coincidencias probado, las 6 reglas innegociables cubiertas | `engine.py` |
 | `planning/` | Planes inmutables + detección de conflictos + frase de autorización, probado | `plan.py` |
 | `transactions/` | Motor de aplicación probado (132 tests en el proyecto), revisado adversarialmente por 4 ángulos de seguridad independientes (2026-09-09): 14 hallazgos, los 4 críticos corregidos + 7 más (11/14 en total); 3 de severidad baja/media documentados como límite conocido en el propio docstring del módulo, no ocultados | `engine.py` |
-| `plex/`, `reports/` | Solo esqueleto (`__init__.py` vacío) | — |
+| `plex/` | Adaptador solo lectura probado (unitario + integración real contra el Plex de Alberto) | `models.py`, `client.py` |
+| `reports/` | Solo esqueleto (`__init__.py` vacío) | — |
 | `cli/` | `doctor` real y probado (unit + integración real contra Plex/NAS) | `main.py`, `checks.py`, `config.py` |
 | `mcp/` | No empezado | — |
 | `.claude/skills/`, `.claude/hooks/` | No empezado | — |
