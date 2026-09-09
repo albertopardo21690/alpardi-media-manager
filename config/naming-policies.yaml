@@ -1,0 +1,36 @@
+# Plantillas de nomenclatura Plex, versionadas. Ver docs/SOURCES.md para la evidencia oficial
+# detrás de cada patrón, y docs/PLEX_RULES.md para la explicación completa.
+#
+# Verificado contra el servidor real de Alberto (Plex Media Server 1.43.3.10828, Fase 0):
+# {edition-...} requiere >=1.28.1 -- cumplido, soportado de verdad, no una suposición.
+
+movies:
+  folder: "{title} ({year}){id_suffix}"
+  file: "{title} ({year}){id_suffix} - {technical_suffix}"
+  id_suffix_format: " {{{provider}-{id}}}"       # p.ej. " {tmdb-78}"
+  edition_suffix_format: " {{edition-{edition_name}}}"
+  # Varias resoluciones/códecs de la MISMA edición son versiones, no ediciones (decisión #7):
+  # van en la misma carpeta, con sufijo técnico después del título, sin tocar los identificadores.
+
+tv_shows:
+  folder: "{title} ({year}){id_suffix}"
+  season_folder: "Season {season:02d}"          # literal "Season", incluso en español -- confirmado en SOURCES.md
+  specials_folder: "Season 00"                  # alias aceptado: "Specials"
+  episode_file: "{title} ({year}) - s{season:02d}e{episode:02d} - {episode_title}"
+  multi_episode_file: "{title} ({year}) - s{season:02d}e{episode_start:02d}-e{episode_end:02d} - {optional_info}"
+  episode_order_default: tmdb_aired              # tmdb_aired | tvdb_aired | tvdb_dvd | tvdb_absolute
+  # Colecciones personales con esquema propio (p.ej. Ceremonias Olímpicas, año como temporada):
+  # NUNCA se imponen a otras bibliotecas -- se preserva la taxonomía ya aprobada tal cual está.
+
+music:
+  file: "{track_number:02d} - {title}"
+  compilation_album_artist: "Various Artists"
+
+subtitles:
+  external_file: "{video_basename}.{iso639_lang}.{ext}"   # p.ej. "Vídeo.es.srt"
+  forced_suffix: ".forced"
+  sdh_suffix: ".sdh"
+
+quarantine:
+  # Nunca dentro de una raíz de biblioteca Plex -- fuera, mismo filesystem cuando sea posible.
+  path_template: "./data/quarantine/{date}/{original_relative_path}"

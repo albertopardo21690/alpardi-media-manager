@@ -1,0 +1,26 @@
+/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+/.env
+/.env.*
+!/.env.example
+
+# Base de datos local y artefactos generados -- nunca en git (regla del encargo:
+# nunca subir vídeos/imágenes/rutas privadas a ningún sitio, git incluido).
+/data/
+/cache/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Planes, journals e informes reales pueden contener nombres de archivos privados.
+/reports/
+/plans/
+/journals/
+
+*.log
+.DS_Store

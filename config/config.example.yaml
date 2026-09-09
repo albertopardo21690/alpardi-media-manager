@@ -1,0 +1,39 @@
+# Copia a config/config.yaml (ignorado por git si contiene rutas reales) y ajusta.
+# Nada de esto activa tráfico ni escrituras por sí solo -- ver docs/DECISIONS.md.
+
+app:
+  locale: es-ES
+  region: ES
+  automation_level: never_without_approval   # única opción soportada hoy, ver decisión #8
+
+plex:
+  base_url_ref: env://ALPARDI_MEDIA_PLEX_BASE_URL
+  token_ref: env://ALPARDI_MEDIA_PLEX_TOKEN_REF
+  min_privilege: true
+
+nas:
+  access_method: ssh_sftp   # nunca smb_mount -- ver decisión #12
+  ssh_host_ref: env://ALPARDI_MEDIA_NAS_SSH_HOST
+
+database:
+  # SQLite local a ESTA máquina (el VPS que ejecuta el gestor) -- nunca una ruta de red.
+  path: ./data/alpardi_media_manager.sqlite3
+
+metadata_strategy: B   # A | B | C -- ver decisión #2; B requiere validación previa en biblioteca de prueba
+
+quarantine:
+  policy: move_never_delete   # ver decisión #10
+  path: ./data/quarantine
+
+editions:
+  auto_merge: false   # ver decisión #7
+
+subtitles:
+  preferred_languages: [es, en]   # ver decisión #6
+
+naming:
+  title_language: es   # ver decisión #3
+  policies_file: ./config/naming-policies.yaml
+
+providers:
+  config_file: ./config/providers.example.yaml

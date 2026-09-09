@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: alpardi-media-manager
+Version: 0.1.0
+Summary: Gestor multimedia conversacional para Plex, controlado desde Claude Code (CLI + MCP stdio, sin panel web).
+License: Proprietary
+Requires-Python: <3.15,>=3.14
+Description-Content-Type: text/markdown
+Requires-Dist: httpx>=0.28
+Requires-Dist: pydantic>=2.9
+Requires-Dist: PyYAML>=6.0
+Requires-Dist: lxml>=5.3
+Provides-Extra: dev
+Requires-Dist: pytest>=8.3; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.24; extra == "dev"
+Requires-Dist: mypy>=1.13; extra == "dev"
+Requires-Dist: ruff>=0.7; extra == "dev"

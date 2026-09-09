@@ -1,0 +1,70 @@
+# Copia a config/providers.yaml y ajusta. `enabled: false` = cero tráfico saliente hacia ese
+# proveedor, sin excepción. Ninguno se activa por decisión de este fichero por sí solo: falta
+# además la credencial real (docs/DECISIONS.md #5 -- perfil B elegido, ninguna cuenta creada
+# todavía) y el consentimiento correspondiente por tipo de dato saliente (docs/PRIVACY-EGRESS.md).
+#
+# Los valores numéricos de límite son topes locales conservadores nuestros, no promesas del
+# proveedor -- ver docs/PROVIDERS.md para la fuente de cada límite real y su fecha de verificación.
+
+providers:
+  outbound_consent_required: true
+  offline_fallback: cache_only
+  default_locale: es-ES
+  default_region: ES
+
+  # --- Perfil A (esencial) ---
+  tmdb:
+    enabled: false
+    credential_ref: keyring://alpardi-media/tmdb-read-token
+    locale: es-ES
+    region: ES
+    local_rate_limit_per_second: 8
+    cache_ttl: 7d
+
+  musicbrainz:
+    enabled: false
+    user_agent: "AlpardiMediaManager/0.1.0 (albertopardo21690@gmail.com)"
+    local_rate_limit_per_second: 1
+    cover_art_archive: true
+
+  tvmaze:
+    enabled: false
+    user_agent: "AlpardiMediaManager/0.1.0 (albertopardo21690@gmail.com)"
+    local_rate_limit: 15/10s
+    cache_ttl: 1h
+
+  # --- Perfil B (completo, elegido por Alberto -- decisión #5) ---
+  thetvdb:
+    enabled: false
+    api_key_ref: keyring://alpardi-media/thetvdb-api-key
+    subscriber_pin_ref: keyring://alpardi-media/thetvdb-pin
+    cache_ttl: 7d
+
+  fanart_tv:
+    enabled: false
+    project_key_ref: keyring://alpardi-media/fanart-project-key
+    personal_key_ref: keyring://alpardi-media/fanart-personal-key
+
+  opensubtitles:
+    enabled: false
+    api_key_ref: keyring://alpardi-media/opensubtitles-api-key
+    user_token_ref: keyring://alpardi-media/opensubtitles-user-token
+    send_moviehash: true       # decisión #9: consentimiento ya dado
+    download_subtitles: true   # decisión #9: consentimiento ya dado
+    preferred_languages: [es, en]
+    download_mode: candidates_only
+
+  # --- No incluidos en el perfil B, sin activar hasta que Alberto lo pida ---
+  anilist:
+    enabled: false
+  anidb:
+    enabled: false
+  trakt:
+    enabled: false
+    sync_direction: disabled
+  omdb:
+    enabled: false
+  wikidata:
+    enabled: false
+  thesportsdb:
+    enabled: false

@@ -1,0 +1,2 @@
+[console_scripts]
+alpardi-media = alpardi_media_manager.cli.main:main
