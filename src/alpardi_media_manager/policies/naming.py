@@ -91,6 +91,21 @@ def proponer_archivo_pelicula(
     return nombre + extension
 
 
+def proponer_carpeta_serie(entrada: EpisodeNamingInput, politicas: dict[str, Any] | None = None) -> str:
+    """Nivel serie (carpeta contenedora de todas las temporadas) -- plantilla `tv_shows.folder`.
+
+    Función hermana de `proponer_carpeta_pelicula`, no una reutilización directa: esa función
+    exige un `MovieNamingInput` (con `edition`/`technical_suffix`, que una serie no tiene) y sus
+    helpers (`_edition_suffix`) están pensados para la sección "movies". Aquí solo hace falta
+    `_id_suffix` (el formato de sufijo de ID de proveedor es genérico, no específico de películas)
+    combinado con la plantilla propia de `tv_shows`."""
+    politicas = politicas or cargar_politicas()
+    id_suf = _id_suffix(politicas, entrada.external_id_namespace, entrada.external_id_value)
+    return _plantilla(politicas, "tv_shows", "folder").format(
+        title=entrada.show_title, year=entrada.year, id_suffix=id_suf,
+    )
+
+
 def proponer_carpeta_temporada(temporada: int, politicas: dict[str, Any] | None = None) -> str:
     politicas = politicas or cargar_politicas()
     if temporada == 0:

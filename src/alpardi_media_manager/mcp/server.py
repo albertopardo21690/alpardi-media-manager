@@ -28,12 +28,17 @@ from mcp.types import ToolAnnotations
 
 from alpardi_media_manager.config import leer_plex_token, nas_ssh_host, plex_base_url
 from alpardi_media_manager.diagnostics.checks import run_all_checks
+from alpardi_media_manager.domain.capabilities import verificar_content_type_soportado
 from alpardi_media_manager.domain.models import ContentType
 from alpardi_media_manager.inventory.scanner import escanear_directorio
-from alpardi_media_manager.matching.engine import verificar_coincidencias_pelicula
+from alpardi_media_manager.matching.engine import (
+    verificar_coincidencias_episodio,
+    verificar_coincidencias_pelicula,
+)
 from alpardi_media_manager.planning.plan import (
     calcular_inventory_hash,
     generar_plan_renombrado,
+    proponer_operaciones_episodio,
     proponer_operaciones_pelicula,
     serializar_plan,
 )
@@ -141,28 +146,34 @@ def providers_status(config_path: str = "config/providers.yaml") -> dict[str, An
 
 @server.tool(annotations=_SOLO_LECTURA_LOCAL)
 def match_check(root: str, library_id: str, content_type: str) -> dict[str, Any]:
-    """Evalúa el estado de coincidencia LOCAL de cada elemento (solo movie por ahora) -- sin
-    llamar a ningún proveedor todavía (ninguno está activo, ver providers_status). Con la lista de
+    """Evalúa el estado de coincidencia LOCAL de cada elemento (movie o tv_episode) -- sin llamar
+    a ningún proveedor todavía (ninguno está activo, ver providers_status). Con la lista de
     candidatos vacía, todo elemento aparece honestamente como needs_review/sin_interpretar: eso es
     correcto y esperado hasta activar al menos un proveedor, nunca un error."""
-    if content_type != "movie":
-        raise ValueError("match_check de momento solo soporta content_type='movie'")
+    tipo = _content_type_o_error(content_type)
+    verificar_content_type_soportado(tipo)
     ruta = _raiz_o_error(root)
-    items = escanear_directorio(ruta, library_id=library_id, content_type=ContentType.MOVIE)
-    resultados = verificar_coincidencias_pelicula(items)
+    items = escanear_directorio(ruta, library_id=library_id, content_type=tipo)
+    if tipo == ContentType.MOVIE:
+        resultados = verificar_coincidencias_pelicula(items)
+    else:  # único otro valor posible tras verificar_content_type_soportado: TV_EPISODE
+        resultados = verificar_coincidencias_episodio(items)
     return {"total": len(resultados), "results": resultados}
 
 
 @server.tool(annotations=_SOLO_LECTURA_LOCAL)
 def plan_rename_preview(root: str, library_id: str, content_type: str) -> dict[str, Any]:
-    """Genera una VISTA PREVIA de un plan de renombrado (solo movie por ahora) -- nunca lo guarda
-    en disco ni toca ningún archivo real. Para guardarlo de verdad y poder aplicarlo después, usa
-    la skill /plex-plan (que sí escribe el plan.json, siempre invocada por Alberto)."""
-    if content_type != "movie":
-        raise ValueError("plan_rename_preview de momento solo soporta content_type='movie'")
+    """Genera una VISTA PREVIA de un plan de renombrado (movie o tv_episode) -- nunca lo guarda en
+    disco ni toca ningún archivo real. Para guardarlo de verdad y poder aplicarlo después, usa la
+    skill /plex-plan (que sí escribe el plan.json, siempre invocada por Alberto)."""
+    tipo = _content_type_o_error(content_type)
+    verificar_content_type_soportado(tipo)
     ruta = _raiz_o_error(root)
-    items = escanear_directorio(ruta, library_id=library_id, content_type=ContentType.MOVIE)
-    operaciones, saltados = proponer_operaciones_pelicula(items)
+    items = escanear_directorio(ruta, library_id=library_id, content_type=tipo)
+    if tipo == ContentType.MOVIE:
+        operaciones, saltados = proponer_operaciones_pelicula(items)
+    else:  # único otro valor posible tras verificar_content_type_soportado: TV_EPISODE
+        operaciones, saltados = proponer_operaciones_episodio(items)
     inventory_hash = calcular_inventory_hash(items)
     plan = generar_plan_renombrado(operaciones, inventory_hash, authorized_root=ruta)
     resultado = serializar_plan(plan)

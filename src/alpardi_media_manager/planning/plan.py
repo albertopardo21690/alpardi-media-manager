@@ -15,11 +15,15 @@ from pathlib import Path
 from typing import Any
 
 from alpardi_media_manager.domain.models import InventoryItem
-from alpardi_media_manager.parsers.filename import parsear_nombre_pelicula
+from alpardi_media_manager.parsers.filename import parsear_nombre_episodio, parsear_nombre_pelicula
 from alpardi_media_manager.policies.naming import (
+    EpisodeNamingInput,
     MovieNamingInput,
+    proponer_archivo_episodio,
     proponer_archivo_pelicula,
     proponer_carpeta_pelicula,
+    proponer_carpeta_serie,
+    proponer_carpeta_temporada,
 )
 
 # Nombres reservados de Windows -- relevantes porque el ecosistema de Alberto incluye un PC
@@ -265,6 +269,44 @@ def proponer_operaciones_pelicula(items: list[InventoryItem]) -> tuple[list[Rena
             edition=info.edition,
         )
         destino = f"{proponer_carpeta_pelicula(entrada)}/{proponer_archivo_pelicula(entrada, item.extension)}"
+        if destino != item.current_path:  # ya está en el nombre canónico -- nada que proponer
+            operaciones.append(RenameOperation(
+                item_id=item.id, source_path=item.current_path,
+                destination_path=destino, size_bytes=item.fingerprint.size_bytes,
+            ))
+    return operaciones, saltados
+
+
+def proponer_operaciones_episodio(items: list[InventoryItem]) -> tuple[list[RenameOperation], int]:
+    """Simétrica a `proponer_operaciones_pelicula`, para `content_type=tv_episode`. Un item cuyo
+    nombre no se puede interpretar, O que sí se interpreta pero no da año, se cuenta como
+    "saltado" -- nunca se inventa un año que el propio nombre no dice ya (regla explícita de
+    CLAUDE.md: "nunca se infiere, nunca se completa"). A diferencia de `matching`, aquí SÍ hace
+    falta el año: sin él no se puede componer la carpeta de serie (`{title} ({year})`).
+
+    El destino se compone en 3 niveles -- carpeta de serie / carpeta de temporada / archivo de
+    episodio -- que `transactions/engine.py` ya soporta sin cambios (crea directorios intermedios
+    automáticamente y trata `destination_path` como una ruta completa, sea de 2 o de 3 niveles).
+
+    Vive aquí (no en cli/) por el mismo motivo que `proponer_operaciones_pelicula`: CLI y MCP son
+    capas hermanas que deben llamar a la misma fuente real, ninguna depende de la otra."""
+    operaciones = []
+    saltados = 0
+    for item in items:
+        info = parsear_nombre_episodio(Path(item.current_path).stem)
+        if info is None or info.year is None:
+            saltados += 1
+            continue
+        entrada = EpisodeNamingInput(
+            show_title=info.show_title, year=info.year, season=info.season,
+            episode_start=info.episode_start, episode_end=info.episode_end,
+            episode_title=info.episode_title,
+        )
+        destino = "/".join((
+            proponer_carpeta_serie(entrada),
+            proponer_carpeta_temporada(entrada.season),
+            proponer_archivo_episodio(entrada, item.extension),
+        ))
         if destino != item.current_path:  # ya está en el nombre canónico -- nada que proponer
             operaciones.append(RenameOperation(
                 item_id=item.id, source_path=item.current_path,

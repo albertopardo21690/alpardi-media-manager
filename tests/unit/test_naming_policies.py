@@ -5,6 +5,7 @@ from alpardi_media_manager.policies.naming import (
     proponer_archivo_episodio,
     proponer_archivo_pelicula,
     proponer_carpeta_pelicula,
+    proponer_carpeta_serie,
     proponer_carpeta_temporada,
 )
 
@@ -100,3 +101,25 @@ def test_archivo_episodio_ceremonias_olimpicas():
     )
     nombre = proponer_archivo_episodio(entrada, ".mp4")
     assert nombre == "Ceremonias Olímpicas (1992) - s1992e01 - Ceremonia Inaugural.mp4"
+
+
+# --- proponer_carpeta_serie ----------------------------------------------------------------------
+
+def test_carpeta_serie_sin_id():
+    entrada = EpisodeNamingInput(show_title="Band of Brothers", year=2001, season=1, episode_start=1)
+    assert proponer_carpeta_serie(entrada) == "Band of Brothers (2001)"
+
+
+def test_carpeta_serie_con_id_tmdb():
+    entrada = EpisodeNamingInput(
+        show_title="Band of Brothers", year=2001, season=1, episode_start=1,
+        external_id_namespace="tmdb", external_id_value="4613",
+    )
+    assert proponer_carpeta_serie(entrada) == "Band of Brothers (2001) {tmdb-4613}"
+
+
+def test_carpeta_serie_1992_cuatro_digitos_de_temporada_no_afecta_al_nombre_de_carpeta():
+    """La carpeta de serie usa solo título/año -- la temporada de 4 dígitos (caso Ceremonias
+    Olímpicas) vive en `proponer_carpeta_temporada`, no aquí."""
+    entrada = EpisodeNamingInput(show_title="Ceremonias Olímpicas", year=1992, season=1992, episode_start=1)
+    assert proponer_carpeta_serie(entrada) == "Ceremonias Olímpicas (1992)"

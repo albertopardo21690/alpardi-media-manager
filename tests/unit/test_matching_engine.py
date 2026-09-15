@@ -1,7 +1,12 @@
 from datetime import UTC, datetime
 
+from alpardi_media_manager.domain.models import ContentType, Fingerprint, InventoryItem
 from alpardi_media_manager.domain.states import ItemState
-from alpardi_media_manager.matching.engine import LocalEvidence, decidir_coincidencia
+from alpardi_media_manager.matching.engine import (
+    LocalEvidence,
+    decidir_coincidencia,
+    verificar_coincidencias_episodio,
+)
 from alpardi_media_manager.providers.models import ExternalId, SearchCandidate
 
 
@@ -126,3 +131,55 @@ def test_sin_candidatos_es_needs_review():
     decision = decidir_coincidencia(evidencia, [])
     assert decision.state == ItemState.NEEDS_REVIEW
     assert decision.candidate is None
+
+
+# --- verificar_coincidencias_episodio -----------------------------------------------------------
+
+def _item_episodio(path: str) -> InventoryItem:
+    ahora = datetime.now(UTC)
+    return InventoryItem(
+        library_id="lib", authorized_root="/data", current_path=path, extension=".mkv",
+        content_type=ContentType.TV_EPISODE,
+        fingerprint=Fingerprint(size_bytes=1, mtime=ahora, quick="q"),
+        discovered_at=ahora, updated_at=ahora,
+    )
+
+
+def test_verificar_coincidencias_episodio_nombre_no_interpretable_es_sin_interpretar():
+    items = [_item_episodio("archivo_cualquiera_sin_patron.mkv")]
+    resultados = verificar_coincidencias_episodio(items)
+    assert resultados[0]["state"] == "sin_interpretar"
+    assert resultados[0]["reasons"] == ["nombre_no_interpretable"]
+
+
+def test_verificar_coincidencias_episodio_sin_ano_es_needs_review_pero_SI_se_evalua():
+    """A diferencia de `proponer_operaciones_episodio` (que salta los episodios sin año),
+    matching sí evalúa un episodio sin año -- no hace falta año para decidir needs_review, y
+    `decidir_coincidencia` ya trata 'sin año' como 'no se puede confirmar automáticamente'."""
+    items = [_item_episodio("Band of Brothers - s01e01 - Currahee.mkv")]
+    resultados = verificar_coincidencias_episodio(items)
+    assert len(resultados) == 1
+    assert resultados[0]["state"] == ItemState.NEEDS_REVIEW.value
+    assert resultados[0]["reasons"] == ["sin_ano_local_no_se_puede_confirmar_automaticamente"]
+
+
+def test_verificar_coincidencias_episodio_con_ano_sin_proveedores_activos_es_needs_review():
+    """Sin ningún proveedor activo (docs/DECISIONS.md #5), `candidatos` siempre es una lista
+    vacía -- todo acaba en needs_review, igual que la versión de película."""
+    items = [_item_episodio("Band of Brothers (2001) - s01e01 - Currahee.mkv")]
+    resultados = verificar_coincidencias_episodio(items)
+    assert resultados[0]["state"] == ItemState.NEEDS_REVIEW.value
+    assert resultados[0]["reasons"] == ["ningun_candidato_con_ano_coincidente"]
+
+
+def test_verificar_coincidencias_episodio_multi_episodio_evalua_todos_los_items():
+    items = [
+        _item_episodio("Band of Brothers (2001) - s01e01 - Currahee.mkv"),
+        _item_episodio("ShowName (2020) - s02e05-e06.mkv"),
+    ]
+    resultados = verificar_coincidencias_episodio(items)
+    assert len(resultados) == 2
+    assert {r["path"] for r in resultados} == {
+        "Band of Brothers (2001) - s01e01 - Currahee.mkv",
+        "ShowName (2020) - s02e05-e06.mkv",
+    }

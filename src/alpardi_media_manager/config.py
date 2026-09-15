@@ -15,6 +15,11 @@ DEFAULT_PLEX_TOKEN_FILE = Path("/root/.config/alpardios/plex.env")
 DEFAULT_PLEX_BASE_URL = "http://100.75.202.28:32400"
 DEFAULT_NAS_SSH_HOST = "NASAlpardimedia"
 
+# Ruta relativa a la ubicación del propio paquete (no al cwd) -- mismo patrón que
+# policies/naming.py::RUTA_POLITICAS_DEFECTO. Coincide con la ruta ya documentada en
+# docs/BACKUP_RESTORE.md ("data/alpardi_media_manager.sqlite3"), y con /data/ ya en .gitignore.
+DEFAULT_DATABASE_PATH = Path(__file__).parent.parent.parent / "data" / "alpardi_media_manager.sqlite3"
+
 
 def leer_plex_token(ruta: Path = DEFAULT_PLEX_TOKEN_FILE) -> str:
     """Lee PLEX_TOKEN=... del fichero ya existente. Nunca se imprime el valor devuelto -- solo
@@ -33,3 +38,8 @@ def plex_base_url() -> str:
 
 def nas_ssh_host() -> str:
     return os.environ.get("ALPARDI_MEDIA_NAS_SSH_HOST", DEFAULT_NAS_SSH_HOST)
+
+
+def database_path() -> Path:
+    valor = os.environ.get("ALPARDI_MEDIA_DB_PATH")
+    return Path(valor) if valor else DEFAULT_DATABASE_PATH

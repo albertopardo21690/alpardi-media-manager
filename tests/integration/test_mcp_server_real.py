@@ -88,10 +88,59 @@ async def test_plan_rename_preview_nunca_escribe_nada_en_disco(tmp_path: Path):
 
 
 async def test_match_check_content_type_no_soportado_es_error_claro(tmp_path: Path):
+    """`music_track` es un `ContentType` real pero plan/match todavía no lo cubre (ver
+    `domain/capabilities.py`) -- a diferencia de `tv_episode`, que desde la Fase 7 sí está
+    soportado (ver los tests de tv_episode más abajo)."""
     async with stdio_client(_server_params()) as (read, write), ClientSession(read, write) as session:
         await session.initialize()
         resultado = await session.call_tool(
             "match_check",
-            {"root": str(tmp_path), "library_id": "lib", "content_type": "tv_episode"},
+            {"root": str(tmp_path), "library_id": "lib", "content_type": "music_track"},
         )
         assert resultado.is_error is True
+
+
+async def test_match_check_content_type_invalido_es_error_claro(tmp_path: Path):
+    async with stdio_client(_server_params()) as (read, write), ClientSession(read, write) as session:
+        await session.initialize()
+        resultado = await session.call_tool(
+            "match_check",
+            {"root": str(tmp_path), "library_id": "lib", "content_type": "disparate"},
+        )
+        assert resultado.is_error is True
+
+
+async def test_match_check_tv_episode_real_via_mcp(tmp_path: Path):
+    """Fase 7: `match_check` ahora también soporta tv_episode -- probado de extremo a extremo por
+    stdio, el mismo transporte real que usará Claude Code."""
+    (tmp_path / "Band of Brothers (2001) - s01e01 - Currahee.mkv").write_bytes(b"contenido de prueba")
+
+    async with stdio_client(_server_params()) as (read, write), ClientSession(read, write) as session:
+        await session.initialize()
+        resultado = await session.call_tool(
+            "match_check",
+            {"root": str(tmp_path), "library_id": "lib-tv", "content_type": "tv_episode"},
+        )
+        assert resultado.is_error is not True
+        assert resultado.structured_content["total"] == 1
+
+
+async def test_plan_rename_preview_tv_episode_real_via_mcp_nunca_escribe_nada_en_disco(tmp_path: Path):
+    """Fase 7: `plan_rename_preview` ahora también soporta tv_episode, componiendo la ruta de 3
+    niveles (serie/temporada/archivo) -- sin tocar ningún archivo real."""
+    (tmp_path / "Band of Brothers (2001) - s01e01 - Currahee.mkv").write_bytes(b"contenido de prueba")
+    antes = sorted(p.name for p in tmp_path.rglob("*"))
+
+    async with stdio_client(_server_params()) as (read, write), ClientSession(read, write) as session:
+        await session.initialize()
+        resultado = await session.call_tool(
+            "plan_rename_preview",
+            {"root": str(tmp_path), "library_id": "lib-tv", "content_type": "tv_episode"},
+        )
+        assert resultado.is_error is not True
+        assert resultado.structured_content["operations"][0]["destination_path"] == (
+            "Band of Brothers (2001)/Season 01/Band of Brothers (2001) - s01e01 - Currahee.mkv"
+        )
+
+    despues = sorted(p.name for p in tmp_path.rglob("*"))
+    assert antes == despues

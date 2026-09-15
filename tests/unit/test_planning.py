@@ -11,6 +11,7 @@ from alpardi_media_manager.planning.plan import (
     deserializar_plan,
     generar_plan_renombrado,
     guardar_plan,
+    proponer_operaciones_episodio,
     serializar_plan,
     verificar_frase_autorizacion,
 )
@@ -244,3 +245,81 @@ def test_plan_cargado_de_disco_se_puede_autorizar_igual_que_el_original(tmp_path
         cargado.frase_autorizacion_esperada(), cargado, inventory_hash_actual="hash-real",
     )
     assert ok, motivo
+
+
+# --- proponer_operaciones_episodio ---------------------------------------------------------------
+
+def _item_episodio(path: str, extension: str = ".mkv", size: int = 1000) -> InventoryItem:
+    ahora = datetime.now(UTC)
+    return InventoryItem(
+        library_id="lib", authorized_root="/data", current_path=path, extension=extension,
+        content_type=ContentType.TV_EPISODE,
+        fingerprint=Fingerprint(size_bytes=size, mtime=ahora, quick="q"),
+        discovered_at=ahora, updated_at=ahora,
+    )
+
+
+def test_proponer_operaciones_episodio_multi_episodio_genera_ruta_de_tres_niveles():
+    items = [
+        _item_episodio("Band of Brothers (2001) - s01e01 - Currahee.mkv"),
+        _item_episodio("ShowName (2020) - s02e05-e06.mkv"),
+    ]
+    operaciones, saltados = proponer_operaciones_episodio(items)
+    assert saltados == 0
+    assert len(operaciones) == 2
+
+    destinos = {op.source_path: op.destination_path for op in operaciones}
+    assert destinos["Band of Brothers (2001) - s01e01 - Currahee.mkv"] == (
+        "Band of Brothers (2001)/Season 01/Band of Brothers (2001) - s01e01 - Currahee.mkv"
+    )
+    assert destinos["ShowName (2020) - s02e05-e06.mkv"] == (
+        "ShowName (2020)/Season 02/ShowName (2020) - s02e05-e06.mkv"
+    )
+
+
+def test_proponer_operaciones_episodio_sin_ano_cuenta_como_saltado():
+    """Regla explícita de CLAUDE.md ("nunca se infiere, nunca se completa"): un nombre de episodio
+    interpretable pero SIN año no debe generar una operación -- se cuenta como saltado, igual que
+    un nombre no interpretable en absoluto."""
+    items = [_item_episodio("Band of Brothers - s01e01 - Currahee.mkv")]
+    operaciones, saltados = proponer_operaciones_episodio(items)
+    assert operaciones == []
+    assert saltados == 1
+
+
+def test_proponer_operaciones_episodio_nombre_no_interpretable_cuenta_como_saltado():
+    items = [_item_episodio("archivo_cualquiera_sin_patron.mkv")]
+    operaciones, saltados = proponer_operaciones_episodio(items)
+    assert operaciones == []
+    assert saltados == 1
+
+
+def test_proponer_operaciones_episodio_ya_bien_nombrado_no_genera_operacion():
+    """Si el destino calculado coincide con el `current_path` actual (la ruta de 3 niveles ya
+    exacta), no hay nada que proponer -- mismo criterio que `proponer_operaciones_pelicula`."""
+    items = [_item_episodio(
+        "Band of Brothers (2001)/Season 01/Band of Brothers (2001) - s01e01 - Currahee.mkv",
+    )]
+    operaciones, saltados = proponer_operaciones_episodio(items)
+    assert operaciones == []
+    assert saltados == 0
+
+
+def test_proponer_operaciones_episodio_reorganiza_a_una_carpeta_de_temporada_distinta():
+    """Caso real que el plan destaca: un episodio archivado bajo la temporada equivocada (o
+    suelto, sin carpeta de temporada) debe reorganizarse a la ruta de 3 niveles correcta."""
+    items = [_item_episodio(
+        "Band of Brothers (2001)/Season 02/Band of Brothers (2001) - s01e01 - Currahee.mkv",
+    )]
+    operaciones, saltados = proponer_operaciones_episodio(items)
+    assert saltados == 0
+    assert len(operaciones) == 1
+    assert operaciones[0].destination_path == (
+        "Band of Brothers (2001)/Season 01/Band of Brothers (2001) - s01e01 - Currahee.mkv"
+    )
+
+
+def test_proponer_operaciones_episodio_usa_el_size_bytes_del_fingerprint():
+    items = [_item_episodio("Serie (2020) - s01e01.mkv", size=123456)]
+    operaciones, _saltados = proponer_operaciones_episodio(items)
+    assert operaciones[0].size_bytes == 123456

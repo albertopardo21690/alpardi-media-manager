@@ -27,7 +27,7 @@ from pathlib import Path
 
 from alpardi_media_manager.domain.models import InventoryItem
 from alpardi_media_manager.domain.states import ItemState
-from alpardi_media_manager.parsers.filename import parsear_nombre_pelicula
+from alpardi_media_manager.parsers.filename import parsear_nombre_episodio, parsear_nombre_pelicula
 from alpardi_media_manager.providers.models import SearchCandidate
 
 
@@ -173,6 +173,36 @@ def verificar_coincidencias_pelicula(items: list[InventoryItem]) -> list[dict[st
         evidencia = LocalEvidence(
             parsed_title=info.title, parsed_year=info.year, entity_type="movie",
             external_id_namespace=info.external_id_namespace, external_id_value=info.external_id_value,
+        )
+        decision = decidir_coincidencia(evidencia, [])
+        resultados.append({
+            "path": item.current_path, "state": decision.state.value,
+            "score": decision.score, "reasons": list(decision.reasons),
+        })
+    return resultados
+
+
+def verificar_coincidencias_episodio(items: list[InventoryItem]) -> list[dict[str, object]]:
+    """Simétrica a `verificar_coincidencias_pelicula`, para `content_type=tv_episode`. A
+    diferencia de `planning` (`proponer_operaciones_episodio`), SÍ tolera episodios sin año: aquí
+    no hace falta construir un nombre de carpeta, solo decidir un estado, y
+    `decidir_coincidencia` ya trata `parsed_year=None` como "no se puede confirmar
+    automáticamente" (needs_review) sin bloquear la evaluación del resto del item.
+
+    Igual que la versión de película, sin ningún proveedor activo todavía `candidatos` siempre es
+    una lista vacía -- por diseño de `decidir_coincidencia`, todo acaba en needs_review. Vive aquí
+    (no en cli/) para que CLI y MCP, capas hermanas, llamen a la misma fuente real."""
+    resultados: list[dict[str, object]] = []
+    for item in items:
+        info = parsear_nombre_episodio(Path(item.current_path).stem)
+        if info is None:
+            resultados.append({
+                "path": item.current_path, "state": "sin_interpretar",
+                "score": 0.0, "reasons": ["nombre_no_interpretable"],
+            })
+            continue
+        evidencia = LocalEvidence(
+            parsed_title=info.show_title, parsed_year=info.year, entity_type="tv_episode",
         )
         decision = decidir_coincidencia(evidencia, [])
         resultados.append({

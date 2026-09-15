@@ -96,10 +96,31 @@ def test_rollback_real_completo(tmp_path: Path, capsys: pytest.CaptureFixture[st
 
 # --- plan rename / apply: el flujo real de dos procesos separados ------------------------------
 
-def test_plan_rename_rechaza_content_type_no_movie(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
-    codigo = cmd_plan_rename(str(tmp_path), "lib", "tv_episode", None, as_json=False)
+def test_plan_rename_content_type_invalido_da_mensaje_de_valor_no_valido(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str],
+):
+    """Un valor que no es un `ContentType` real (p.ej. un typo) debe distinguirse claramente de
+    un `ContentType` válido pero todavía no soportado por plan/match -- son dos errores distintos
+    con dos mensajes distintos (bug real corregido en la Fase 7: antes ambos daban el mismo
+    mensaje engañoso de "solo soporta movie")."""
+    codigo = cmd_plan_rename(str(tmp_path), "lib", "disparate", None, as_json=False)
     assert codigo == 1
-    assert "movie" in capsys.readouterr().err
+    error = capsys.readouterr().err
+    assert "inválido" in error
+    assert "aún no soportado" not in error
+
+
+def test_plan_rename_content_type_valido_pero_no_soportado_da_mensaje_distinto(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str],
+):
+    """`music_track` es un `ContentType` real (a diferencia del caso anterior), pero plan/match
+    todavía no lo cubre -- debe dar el mensaje de "aún no soportado", nunca el de "valor
+    inválido" ni un crash."""
+    codigo = cmd_plan_rename(str(tmp_path), "lib", "music_track", None, as_json=False)
+    assert codigo == 1
+    error = capsys.readouterr().err
+    assert "aún no soportado" in error
+    assert "inválido" not in error
 
 
 def test_plan_rename_propone_nombre_canonico(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
@@ -118,6 +139,20 @@ def test_plan_rename_salta_nombres_que_no_se_pueden_interpretar(tmp_path: Path, 
     assert codigo == 0
     salida = capsys.readouterr().out
     assert "no se pudieron interpretar" in salida
+
+
+def test_plan_rename_tv_episode_genera_ruta_de_tres_niveles(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    """Test nuevo de la Fase 7: `plan rename` ahora también soporta tv_episode, generando la ruta
+    de 3 niveles (serie/temporada/archivo) vía `proponer_operaciones_episodio`."""
+    (tmp_path / "Band of Brothers (2001) - s01e01 - Currahee.mkv").write_bytes(b"contenido de prueba")
+
+    codigo = cmd_plan_rename(str(tmp_path), "lib-tv", "tv_episode", None, as_json=True)
+    assert codigo == 0
+    plan_json = json.loads(capsys.readouterr().out)
+    assert plan_json["total_operations"] == 1
+    assert plan_json["operations"][0]["destination_path"] == (
+        "Band of Brothers (2001)/Season 01/Band of Brothers (2001) - s01e01 - Currahee.mkv"
+    )
 
 
 def test_plan_rename_no_propone_nada_si_ya_esta_en_formato_canonico(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
@@ -200,10 +235,24 @@ def test_providers_status_real(tmp_path: Path, capsys: pytest.CaptureFixture[str
 
 # --- match check ---------------------------------------------------------------------------------
 
-def test_match_check_rechaza_content_type_no_movie(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
-    codigo = cmd_match_check(str(tmp_path), "lib", "tv_episode", as_json=False)
+def test_match_check_content_type_invalido_da_mensaje_de_valor_no_valido(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str],
+):
+    codigo = cmd_match_check(str(tmp_path), "lib", "disparate", as_json=False)
     assert codigo == 1
-    assert "movie" in capsys.readouterr().err
+    error = capsys.readouterr().err
+    assert "inválido" in error
+    assert "aún no soportado" not in error
+
+
+def test_match_check_content_type_valido_pero_no_soportado_da_mensaje_distinto(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str],
+):
+    codigo = cmd_match_check(str(tmp_path), "lib", "music_track", as_json=False)
+    assert codigo == 1
+    error = capsys.readouterr().err
+    assert "aún no soportado" in error
+    assert "inválido" not in error
 
 
 def test_match_check_sin_proveedores_todo_es_needs_review_o_sin_interpretar(
@@ -218,6 +267,19 @@ def test_match_check_sin_proveedores_todo_es_needs_review_o_sin_interpretar(
     assert salida["total"] == 2
     estados = {r["state"] for r in salida["results"]}
     assert estados <= {"needs_review", "sin_interpretar"}
+
+
+def test_match_check_tv_episode_da_resultados_de_matching_reales(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    """Test nuevo de la Fase 7: `match check` ahora también soporta tv_episode, vía
+    `verificar_coincidencias_episodio`."""
+    (tmp_path / "Band of Brothers (2001) - s01e01 - Currahee.mkv").write_bytes(b"x")
+
+    codigo = cmd_match_check(str(tmp_path), "lib-tv", "tv_episode", as_json=True)
+    assert codigo == 0
+    salida = json.loads(capsys.readouterr().out)
+    assert salida["total"] == 1
+    assert salida["results"][0]["state"] == "needs_review"
+    assert salida["results"][0]["reasons"] == ["ningun_candidato_con_ano_coincidente"]
 
 
 # --- backup create / verify ----------------------------------------------------------------------
