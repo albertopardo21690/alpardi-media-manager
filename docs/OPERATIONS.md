@@ -13,6 +13,30 @@ cd /opt/alpardi-media-manager
 cuando el motor tenga sentido ejecutarlo como servicio (escaneos incrementales programados). Hasta
 entonces, todo se ejecuta manualmente desde la CLI o desde Claude Code, nunca como daemon.
 
+## Vigilante de vídeo del NAS (solo lectura, desde 2026-11-15)
+
+Módulo `alpardi_media_manager.watch` + `deploy/systemd/alpardimedia-watch.{service,timer}` (instalados en
+`/etc/systemd/system/`; ejecución diaria a las 05:40 hora de Madrid, `Persistent=true`).
+
+- **Qué hace:** instantánea de los vídeos del NAS por SSH (`find`+`stat`; el NAS usa BusyBox, sin `-printf`),
+  salta las carpetas privadas (`Zona privada`, `Videos mensuales MJ`, `Dedicatorias`, `_admin`, `_toolkit`,
+  `_incoming_*`), detecta nuevos/desaparecidos/modificados, clasifica los nuevos (¿siguen el nombrado Plex?
+  ¿están en `_General_Inbox`?) y busca duplicados: mismo tamaño + distinto inodo + SHA-256 de los primeros y
+  últimos 4 MiB. Los enlaces duros (mismo inodo) no cuentan: son duplicados ya resueltos.
+- **Qué NO hace:** no mueve, renombra ni borra nada, no toca Plex. Un fichero tocado hace menos de 15 min se
+  considera «en copia» y se evalúa en la siguiente ejecución.
+- **Duplicados entre bibliotecas:** `Ciclos/<actor>/`, `VHS Digitalizados - Catalogo/Prueba/Peliculas`… repiten
+  películas a propósito; el informe los separa de los de «misma biblioteca». Para ahorrar ese espacio sin quitar
+  nada la vía es un enlace duro (como en la limpieza del 26-oct), no la cuarentena.
+- **Salida:** `data/watch/ultimo.md` / `ultimo.json` / `informes/AAAA-MM-DD_HHMM.md` (no van a git).
+  `instantanea.json` es la línea base; si se borra, la siguiente ejecución crea una nueva (sin avisos de «nuevos»).
+- **Manual:** `./.venv/bin/python -m alpardi_media_manager.watch [--confirmar-gb N]`. `--confirmar-gb` añade SHA-256
+  del fichero entero a los grupos pequeños hasta ese presupuesto de GB (lectura pesada del NAS; `nice`/`ionice`).
+- **Pendiente (no implementado):** `plan quarantine` y `plan hardlink` (hoy solo existe `plan rename`); refresco
+  de Plex (falta el token en este VPS y Plex no responde desde aquí); aviso al terminar.
+- **Restaurar:** copiar `deploy/systemd/alpardimedia-watch.*` a `/etc/systemd/system/`,
+  `systemctl daemon-reload && systemctl enable --now alpardimedia-watch.timer`.
+
 ## Ejecución cerca de los datos
 
 Ver `docs/ARCHITECTURE.md` — el gestor corre en el VPS, accede al NAS por SSH/SFTP. Revisar esta

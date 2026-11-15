@@ -1,0 +1,22 @@
+# AlpardiMedia Manager - vigilante de la biblioteca de video del NAS (SOLO LECTURA).
+# Toma una instantanea por SSH, detecta ficheros nuevos y posibles duplicados y escribe un informe en
+# /opt/alpardi-media-manager/data/watch/. No mueve, renombra ni borra nada y no toca Plex (CLAUDE.md,
+# invariantes 2-4): actuar sobre un duplicado o un nombre exige un plan inmutable + autorizacion de Alberto.
+[Unit]
+Description=AlpardiMedia Manager - vigilante de video del NAS (solo lectura)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/alpardi-media-manager
+ExecStart=/opt/alpardi-media-manager/.venv/bin/python -m alpardi_media_manager.watch
+Nice=19
+IOSchedulingClass=idle
+TimeoutStartSec=2h
+# Endurecimiento: solo puede escribir en su directorio de estado (y leer ~/.ssh para llegar al NAS)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/alpardi-media-manager/data
