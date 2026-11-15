@@ -363,6 +363,7 @@ def ejecutar(
                 for ruta, h in huellas_remotas(host, [f.ruta for f in falta], completo=True).items():
                     f = next(x for x in falta if x.ruta == ruta)
                     cache[clave(f, "completa")] = h
+                _guardar_json(estado / "huellas.json", cache)   # por grupo: si se corta, no se pierde lo ya calculado
         completas = {c[0].ruta: cache[clave(c[0], "completa")] for g in grupos for c in g.copias
                      if clave(c[0], "completa") in cache}
         for g in grupos:
