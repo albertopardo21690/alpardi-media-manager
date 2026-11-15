@@ -39,6 +39,13 @@ Módulo `alpardi_media_manager.watch` + `deploy/systemd/alpardimedia-watch.{serv
 - **Pendiente (no implementado):** `plan quarantine` y `plan hardlink` (hoy solo existe `plan rename`); refresco de Plex
   (hoy hay token en `/root/assistant/credentials/plex.txt` y túnel `ssh -L 32499:localhost:32400 NASAlpardimedia`, pero el túnel
   lo mantiene a mano otra sesión: habría que hacerlo un servicio propio antes de automatizar el refresco).
+- **Enlaces duros por SSH (2026-11-15/16):** `alpardi_media_manager.watch.enlazar` (`generar` → `comprobar` → `aplicar` → `revertir`).
+  Decisión de Alberto, FUERA del motor transaccional (no hay backend SFTP): alcance cerrado a pares de bibliotecas
+  autorizados, plan inmutable con huella, frase exacta `AUTORIZO ENLACES PLAN <huella> SOBRE <n> OPERACIONES`, comprobación
+  previa de tamaño/fecha/inodo por par, enlace temporal + renombrado atómico, diario y reversión. Aplicados 50/50 (180,1 GB;
+  el NAS pasó de 481,5 a 649,3 GiB libres; Btrfs libera el espacio de forma diferida, tarda ~1 min). Registro en
+  `docs/registros/enlaces-20261115/`. Lección: un componente nuevo del manifiesto de copias NO puede ser `kind: new` sin lógica
+  en `backup.sh` (falla y dispara una alerta real por Telegram): usar el repo (git-remote) para registros pequeños.
 - **Piloto de la Fase 5 (decisión #11) — APARCADO a propósito (2026-11-15):** no existe ningún backend SFTP en `src/`
   (`grep -ri sftp src` vacío): el motor transaccional (`plan`/`apply`) opera sobre rutas locales y el NAS no se
   monta (decisión #12). Antes de un piloto real hay que elegir UNA vía: (a) implementar un backend SFTP/SSH en
