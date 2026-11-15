@@ -6,6 +6,7 @@
 Description=AlpardiMedia Manager - vigilante de video del NAS (solo lectura)
 After=network-online.target
 Wants=network-online.target
+OnFailure=alpardimedia-watch-fallo.service
 
 [Service]
 Type=oneshot
@@ -14,6 +15,8 @@ ExecStart=/opt/alpardi-media-manager/.venv/bin/python -m alpardi_media_manager.w
 Nice=19
 IOSchedulingClass=idle
 TimeoutStartSec=2h
+# El aviso corre SIN el endurecimiento de abajo (prefijo +): alert.sh escribe su propio log
+ExecStartPost=+/opt/alpardi-media-manager/deploy/systemd/alpardimedia-watch-aviso.sh
 # Endurecimiento: solo puede escribir en su directorio de estado (y leer ~/.ssh para llegar al NAS)
 NoNewPrivileges=true
 PrivateTmp=true

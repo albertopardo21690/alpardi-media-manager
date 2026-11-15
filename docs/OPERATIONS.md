@@ -32,14 +32,19 @@ Módulo `alpardi_media_manager.watch` + `deploy/systemd/alpardimedia-watch.{serv
   `instantanea.json` es la línea base; si se borra, la siguiente ejecución crea una nueva (sin avisos de «nuevos»).
 - **Manual:** `./.venv/bin/python -m alpardi_media_manager.watch [--confirmar-gb N]`. `--confirmar-gb` añade SHA-256
   del fichero entero a los grupos pequeños hasta ese presupuesto de GB (lectura pesada del NAS; `nice`/`ionice`).
-- **Pendiente (no implementado):** `plan quarantine` y `plan hardlink` (hoy solo existe `plan rename`); refresco
-  de Plex (falta el token en este VPS y Plex no responde desde aquí); aviso al terminar.
+- **Aviso (desde 2026-11-15):** `alpardimedia-watch-aviso.sh` (ExecStartPost con `+`, sin endurecimiento) manda UN mensaje
+  por el canal de alertas del sistema de recuperación (`alert.sh`, Telegram) solo si hay ficheros nuevos o modificados;
+  no avisa en la línea base, por duplicados ni sin novedades. `alpardimedia-watch-fallo.service` (OnFailure) avisa si el
+  vigilante falla. Probado contra un servidor de Telegram falso local (`CLAUDE_RECOVERY_TELEGRAM_API_BASE`), sin enviar mensajes reales.
+- **Pendiente (no implementado):** `plan quarantine` y `plan hardlink` (hoy solo existe `plan rename`); refresco de Plex
+  (hoy hay token en `/root/assistant/credentials/plex.txt` y túnel `ssh -L 32499:localhost:32400 NASAlpardimedia`, pero el túnel
+  lo mantiene a mano otra sesión: habría que hacerlo un servicio propio antes de automatizar el refresco).
 - **Piloto de la Fase 5 (decisión #11) — APARCADO a propósito (2026-11-15):** no existe ningún backend SFTP en `src/`
   (`grep -ri sftp src` vacío): el motor transaccional (`plan`/`apply`) opera sobre rutas locales y el NAS no se
   monta (decisión #12). Antes de un piloto real hay que elegir UNA vía: (a) implementar un backend SFTP/SSH en
   `transactions/` con su revisión de seguridad, o (b) ejecutar el gestor en el NAS (Docker de ADM). Tampoco hay lote
   natural todavía (`_General_Inbox` vacía). Recomendación: esperar a tener un lote real de ficheros nuevos y decidir entonces.
-- **Restaurar:** copiar `deploy/systemd/alpardimedia-watch.*` a `/etc/systemd/system/`,
+- **Restaurar:** copiar `deploy/systemd/alpardimedia-watch*.{service,timer}` a `/etc/systemd/system/`,
   `systemctl daemon-reload && systemctl enable --now alpardimedia-watch.timer`.
 
 ## Ejecución cerca de los datos

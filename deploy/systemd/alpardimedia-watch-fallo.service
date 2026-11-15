@@ -1,0 +1,7 @@
+# Se lanza SOLO si alpardimedia-watch.service falla (OnFailure=): avisa por el canal de alertas del sistema de recuperacion.
+[Unit]
+Description=AlpardiMedia Manager - aviso de fallo del vigilante de video
+
+[Service]
+Type=oneshot
+ExecStart=/opt/claude-recovery/scripts/alert.sh "El vigilante de vídeo del NAS ha fallado. Revisa: journalctl -u alpardimedia-watch.service -n 30"
