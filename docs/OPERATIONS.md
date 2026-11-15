@@ -34,6 +34,11 @@ Módulo `alpardi_media_manager.watch` + `deploy/systemd/alpardimedia-watch.{serv
   del fichero entero a los grupos pequeños hasta ese presupuesto de GB (lectura pesada del NAS; `nice`/`ionice`).
 - **Pendiente (no implementado):** `plan quarantine` y `plan hardlink` (hoy solo existe `plan rename`); refresco
   de Plex (falta el token en este VPS y Plex no responde desde aquí); aviso al terminar.
+- **Piloto de la Fase 5 (decisión #11) — APARCADO a propósito (2026-11-15):** no existe ningún backend SFTP en `src/`
+  (`grep -ri sftp src` vacío): el motor transaccional (`plan`/`apply`) opera sobre rutas locales y el NAS no se
+  monta (decisión #12). Antes de un piloto real hay que elegir UNA vía: (a) implementar un backend SFTP/SSH en
+  `transactions/` con su revisión de seguridad, o (b) ejecutar el gestor en el NAS (Docker de ADM). Tampoco hay lote
+  natural todavía (`_General_Inbox` vacía). Recomendación: esperar a tener un lote real de ficheros nuevos y decidir entonces.
 - **Restaurar:** copiar `deploy/systemd/alpardimedia-watch.*` a `/etc/systemd/system/`,
   `systemctl daemon-reload && systemctl enable --now alpardimedia-watch.timer`.
 
