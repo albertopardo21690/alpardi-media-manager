@@ -27,6 +27,7 @@ def test_parsear_instantanea_ignora_lineas_malformadas() -> None:
 def test_comando_instantanea_excluye_privadas_y_solo_lee() -> None:
     c = v.comando_instantanea()
     assert "Zona privada" in c and "-prune" in c and "stat -c" in c
+    assert "-path './_cuarentena_*'" in c   # las carpetas de cuarentena no se vigilan
     for peligroso in (" rm ", " mv ", " cp ", "-delete", "-exec rm"):
         assert peligroso not in c
 

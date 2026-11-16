@@ -37,7 +37,9 @@ from alpardi_media_manager.parsers.filename import (
 SSH_HOST = "NASAlpardimedia"
 BASE = "/volume1/home/alpardimedia/Videos"
 # Carpetas privadas/familiares o de uso interno: ni se listan ni se leen.
-EXCLUIDAS = ("Zona privada", "Videos mensuales MJ", "Dedicatorias", "_admin", "_toolkit", "_incoming_*")
+EXCLUIDAS = (
+    "Zona privada", "Videos mensuales MJ", "Dedicatorias", "_admin", "_toolkit", "_incoming_*", "_cuarentena_*",
+)
 BANDEJA_ENTRADA = "_General_Inbox"
 EXTENSIONES = ("mkv", "mp4", "avi", "m4v", "mov", "ts", "mpg", "wmv")
 ESTABLE_S = 900          # un fichero modificado hace menos de 15 min puede estar copiándose: se espera
