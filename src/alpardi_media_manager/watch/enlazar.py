@@ -69,8 +69,16 @@ def grupos_confirmados(
     return salida
 
 
-def en_alcance(copias: list[list[v.Fichero]]) -> bool:
+def en_alcance(
+    copias: list[list[v.Fichero]], misma_raiz: frozenset[str] = frozenset(), excluir: tuple[str, ...] = ()
+) -> bool:
+    """Por defecto solo grupos ENTRE bibliotecas dentro de `PARES_AUTORIZADOS`. `misma_raiz` abre, de forma explícita y por
+    ejecución, las carpetas raíz cuyos duplicados internos están autorizados; `excluir` saca rutas por prefijo."""
+    if any(f.ruta.startswith(pre) for c in copias for f in c for pre in excluir):
+        return False
     raices = [c[0].carpeta_raiz for c in copias]
+    if len(set(raices)) == 1 and raices[0] in misma_raiz:
+        return True
     if len(set(raices)) != len(raices):      # dos copias en la misma carpeta raíz = «misma biblioteca»: fuera
         return False
     return any(set(raices) <= par for par in PARES_AUTORIZADOS)
@@ -84,10 +92,13 @@ def elegir_origen(copias: list[list[v.Fichero]]) -> int:
     return min(range(len(copias)), key=clave)
 
 
-def construir_plan(ficheros: list[v.Fichero], cache: dict[str, str]) -> list[Operacion]:
+def construir_plan(
+    ficheros: list[v.Fichero], cache: dict[str, str],
+    misma_raiz: frozenset[str] = frozenset(), excluir: tuple[str, ...] = (),
+) -> list[Operacion]:
     plan: list[Operacion] = []
     for copias in grupos_confirmados(ficheros, cache):
-        if not en_alcance(copias):
+        if not en_alcance(copias, misma_raiz, excluir):
             continue
         i = elegir_origen(copias)
         o = min(copias[i], key=lambda x: (len(x.ruta), x.ruta))
@@ -160,7 +171,7 @@ def cmd_generar(a: argparse.Namespace) -> int:
     if snap is None:
         print("ERROR: no hay instantánea; ejecuta antes el vigilante", file=sys.stderr)
         return 1
-    plan = construir_plan(list(snap.values()), cache_raw)
+    plan = construir_plan(list(snap.values()), cache_raw, frozenset(a.misma_raiz), tuple(a.excluir))
     out = {"generado": datetime.now(v.MADRID).isoformat(timespec="seconds"), "huella": huella_plan(plan),
            "operaciones": [asdict(o) for o in plan]}
     a.salida.parent.mkdir(parents=True, exist_ok=True)
@@ -250,6 +261,9 @@ def main(argv: list[str] | None = None) -> int:
     g = sub.add_parser("generar", help="Genera el plan inmutable a partir de lo confirmado por el vigilante")
     g.add_argument("--estado", type=Path, default=v.DIR_ESTADO)
     g.add_argument("--salida", type=Path, default=Path("/root/nas-dedupe/plan-enlaces-20261115.json"))
+    g.add_argument("--misma-raiz", action="append", default=[], metavar="CARPETA",
+                   help="Autoriza duplicados DENTRO de esta carpeta raíz (repetible)")
+    g.add_argument("--excluir", action="append", default=[], metavar="PREFIJO", help="Excluye rutas que empiecen así (repetible)")
     for nombre, ayuda in (("comprobar", "Ensayo de solo lectura"), ("aplicar", "Aplica el plan (exige la frase exacta)"),
                           ("revertir", "Vuelve a dejar copias independientes")):
         s = sub.add_parser(nombre, help=ayuda)

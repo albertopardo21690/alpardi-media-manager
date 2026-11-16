@@ -111,3 +111,14 @@ def test_aplicar_exige_la_frase_exacta(tmp_path: Path) -> None:
     p.write_text(json.dumps({"huella": e.huella_plan(plan), "operaciones": [o.__dict__ for o in plan]}), encoding="utf-8")
     rc = e.main(["aplicar", "--plan", str(p), "--diario", str(tmp_path / "d.jsonl"), "--autorizo", "si, adelante"])
     assert rc == 3 and not (tmp_path / "d.jsonl").exists()
+
+
+def test_misma_raiz_solo_si_se_autoriza_explicitamente_y_excluir_la_saca() -> None:
+    a = f("Sagas Cinematograficas/Clases grabadas/a.mp4", 1, 2 * GB)
+    b = f("Sagas Cinematograficas/Master/b.mp4", 2, 2 * GB)
+    cache = cache_para((a, "h"), (b, "h"))
+    assert e.construir_plan([a, b], cache) == []                                                    # por defecto: fuera
+    assert len(e.construir_plan([a, b], cache, frozenset({"Sagas Cinematograficas"}))) == 1         # autorizada
+    assert e.construir_plan([a, b], cache, frozenset({"Cursos"})) == []                              # otra raíz: sigue fuera
+    assert e.construir_plan([a, b], cache, frozenset({"Sagas Cinematograficas"}),
+                            ("Sagas Cinematograficas/Master/",)) == []                               # excluida por prefijo

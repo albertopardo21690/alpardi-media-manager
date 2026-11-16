@@ -11,3 +11,12 @@ puede listar, `-DryRun`. Original en `daily-sync.ps1.bak-20261116` (en el PC).
   `Videos/_cuarentena_duplicados_20261116/Cursos/<módulo>/`. Para deshacer: `mv` de vuelta a la misma ruta de `Cursos/<módulo>/`.
 - `carpetas-vacias-20261116.log`: 13 carpetas VACÍAS creadas por el mismo fallo, borradas con `rmdir` (solo si vacías).
 - Comprobación en Plex: episodios con más de una versión, 9 → 0 (M09 3, M10 14, M11 14 episodios).
+
+## Actualización (16-nov, tarde): destino nuevo del script
+Alberto movió M09/M10/M11 de `Videos/Cursos` al archivo oficial de ILERNA
+(`Documentos/Estudios/FP/Centros/ILERNA Online/ILERNA FP/Desarrollo de Aplicaciones Web a distancia DAW Online/4 Semestre 1S 2627/<módulo>/`):
+videotutorías en `Videotutorías/Season 1` y material suelto en `Recursos`. `daily-sync.ps1` se adaptó: sube ahí (nombre «Mnn … - SnnEnn - …»
+→ `Videotutorías/Season 1`; el resto → `Recursos`), NUNCA crea carpetas de módulo (si falta, lo omite y lo anota) y compara por nombre O tamaño
+en todo el módulo. Copias en el PC: `daily-sync.ps1.bak-20261116` (original) y `.bak2-20261116` (versión intermedia).
+Prueba en seco: 0 de 37 por subir (9 reconocidos por tamaño con otro nombre). Clasificación: 7/7.
+Además, 5 enlaces duros más (4 operaciones + la cuarentena de «El difunto es un vivo (1956)»): `plan-enlaces-20261116.json`, `enlaces-20261116.jsonl`.
