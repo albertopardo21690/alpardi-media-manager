@@ -20,3 +20,12 @@ videotutorías en `Videotutorías/Season 1` y material suelto en `Recursos`. `da
 en todo el módulo. Copias en el PC: `daily-sync.ps1.bak-20261116` (original) y `.bak2-20261116` (versión intermedia).
 Prueba en seco: 0 de 37 por subir (9 reconocidos por tamaño con otro nombre). Clasificación: 7/7.
 Además, 5 enlaces duros más (4 operaciones + la cuarentena de «El difunto es un vivo (1956)»): `plan-enlaces-20261116.json`, `enlaces-20261116.jsonl`.
+
+## Actualización (16-nov, noche)
+- Primera ejecución real del `daily-sync.ps1` corregido (21:00:44): «subidos 0 video(s) nuevo(s)». No recreó carpetas en `Cursos`; Plex «ILERNA FP» (sección 35): M09 3, M10 14, M11 14 episodios.
+- `push_to_nas.ps1` (reescrito a las 15:55 por otra sesión) tenía TRES defectos: (1) guardado en UTF-8 sin BOM → PowerShell 5.1 lo lee como ANSI y la tilde de
+  «Videotutorías» sale como `Ã­` (bytes c3 83 c2 ad en vez de c3 ad), creando carpetas rotas; (2) comillas dobles escapadas en los `mkdir` (carpetas basura sueltas
+  en el home del NAS); (3) las mismas comillas en los `ls`, así que el listado de lo ya existente salía vacío. Arreglado (autorizado): comillas simples en las 5 líneas
+  `ssh`, y BOM UTF-8. Copia propia `.bak2-20261116` (la `.bak-20261116` es de la otra sesión). Verificado por AST: la tilde del literal vale 237 (í).
+- Borradas con `rmdir` 5 carpetas vacías basura (`Sostenibilidad`, `aplicada`, `al`, `sistema`, `productivo` en el home de admin; 3 subcarpetas vacías de `productivo`).
+- LECCIÓN: un script .ps1 con acentos debe guardarse CON BOM, o construir los caracteres con `[char]0xNN`. Nunca fiarse de cómo SE VE una tilde en la salida del PC (CP850): comparar bytes.
